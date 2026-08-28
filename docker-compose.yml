@@ -1,7 +1,12 @@
-# Phase 1: only `poc` does anything.
-# qdrant and redis are declared now because Phase 2 needs them and they are
-# pure images - no code required. Bring them up to prove the infra is real:
-#   docker compose up -d qdrant redis
+# Two things live here.
+#
+#   poc                  the Phase 1 proof of concept. Unchanged, still runs
+#                        with the network switched off.
+#   gateway + nginx      the Phase 2 gateway. Starts in mock mode, so it
+#                        needs no API key and no internet.
+#
+# qdrant and redis stay behind the phase2 profile until Week 3 actually uses
+# them, so a plain `docker compose up` does not start what nothing talks to.
 services:
   poc:
     build: .
@@ -11,6 +16,45 @@ services:
     network_mode: none
     # Override args at run time:  docker compose run --rm poc --fast
     # command: ["--fast"]
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.gateway
+      args:
+        BUILD_SHA: "${BUILD_SHA:-unknown}"
+    image: sentrygate-gateway
+    container_name: sentrygate-gateway
+    environment:
+      # Every value below has a safe default, so this runs on a fresh clone
+      # with no .env file at all. Compose reads .env if it is there.
+      PROVIDER_MODE: "${PROVIDER_MODE:-mock}"
+      PROVIDER_RECORD: "${PROVIDER_RECORD:-off}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      DEFAULT_MODEL: "${DEFAULT_MODEL:-gpt-4o-mini}"
+      SPEND_CAP_USD_PER_DAY: "${SPEND_CAP_USD_PER_DAY:-2.0}"
+      # The experiment switches. Phase 2 is the vulnerable baseline.
+      PIPELINE_ORDER: "${PIPELINE_ORDER:-cache_first}"
+      CACHE_VERDICT_FILTER: "${CACHE_VERDICT_FILTER:-off}"
+      CACHE_REVERIFY_HIGH_RISK: "${CACHE_REVERIFY_HIGH_RISK:-off}"
+      ROUTER_MODE: "${ROUTER_MODE:-fixed}"
+      SIM_THRESHOLD: "${SIM_THRESHOLD:-0.85}"
+      QDRANT_URL: "${QDRANT_URL:-http://qdrant:6333}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+    # The request log, the cassettes and the spend ledger live here, so they
+    # survive a restart and can be read from the host without docker cp.
+    volumes: ["./data:/data"]
+    # Direct port for debugging. Normal traffic goes through nginx on 8080.
+    ports: ["8000:8000"]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sentrygate-nginx
+    volumes: ["./deploy/nginx.conf:/etc/nginx/nginx.conf:ro"]
+    ports: ["8080:80"]
+    depends_on:
+      gateway:
+        condition: service_healthy
 
   qdrant:
     image: qdrant/qdrant:v1.12.4

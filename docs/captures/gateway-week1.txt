@@ -1,0 +1,90 @@
+--- health ---
+{
+    "status": "ok",
+    "uptime_s": 27.8,
+    "provider_mode": "mock",
+    "default_model": "gpt-4o-mini",
+    "build_sha": "426df8f",
+    "log_path": "/data/requests.jsonl",
+    "config": {
+        "pipeline_order": "cache_first",
+        "verdict_filter": "off",
+        "reverify": "off",
+        "router": "fixed",
+        "sim_threshold": 0.85,
+        "provider_mode": "mock",
+        "build_sha": "426df8f"
+    },
+    "screening": "not built yet (Week 2)",
+    "cache": "not built yet (Week 3)"
+}
+
+--- a request ---
+{
+    "id": "chatcmpl-017fc2eed7e645f09d2da802",
+    "object": "chat.completion",
+    "created": 1787932234,
+    "model": "gpt-4o-mini",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "This is a mock reply from SentryGate. No model was called. You said: what is the capital of France?"
+            },
+            "finish_reason": "stop"
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 7,
+        "completion_tokens": 24,
+        "total_tokens": 31
+    }
+}
+
+--- what happened to it ---
+x-sentrygate-provider: mock
+x-sentrygate-screened: false
+x-sentrygate-verdict: unscreened
+x-sentrygate-cache: disabled
+x-sentrygate-request-id: 626d756722934e46ac3292b00c1c3a21
+
+--- the log line ---
+{
+    "ts": "2026-08-28T15:50:34Z",
+    "request_id": "626d756722934e46ac3292b00c1c3a21",
+    "api_key_id": "anonymous",
+    "model_requested": "gpt-4o-mini",
+    "model_used": "gpt-4o-mini",
+    "prompt_hash": "d65feddab13380bbd21b8e84931d9f592aebcfb4ee68e0d7af124aa8beaadec2",
+    "prompt_len": 30,
+    "screening_ran": false,
+    "verdict": null,
+    "cache": {
+        "outcome": "disabled",
+        "similarity": null,
+        "matched_id": null,
+        "threshold": null
+    },
+    "provider": "mock",
+    "tokens": {
+        "in": 7,
+        "out": 24
+    },
+    "cost_usd": 0.0,
+    "latency_ms": {
+        "provider": 0.01,
+        "total": 0.5
+    },
+    "status": 200,
+    "block_reason": null,
+    "config": {
+        "pipeline_order": "cache_first",
+        "verdict_filter": "off",
+        "reverify": "off",
+        "router": "fixed",
+        "sim_threshold": 0.85,
+        "provider_mode": "mock",
+        "build_sha": "426df8f"
+    }
+}

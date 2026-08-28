@@ -139,6 +139,42 @@ exactly when you are talking about it.
 
 ---
 
+## Phase 2 so far: the gateway
+
+```bash
+make gateway-up      # nginx + gateway on http://127.0.0.1:8080
+make gateway-smoke   # health, a real request, and the log line it wrote
+make gateway-down
+```
+
+No API key needed. The gateway starts in **mock mode**, so a fresh clone runs
+with no key and no internet.
+
+What exists today, and what does not:
+
+| Part | State |
+|---|---|
+| OpenAI-compatible API, nginx in front | done |
+| Model calls, with record and replay | done |
+| One log line per request | done |
+| Safety check | Week 2 |
+| Cache | Week 3 |
+
+The response headers say so on every request:
+
+```
+x-sentrygate-provider: mock
+x-sentrygate-screened: false
+x-sentrygate-cache:    disabled
+```
+
+Recorded output: [`docs/captures/gateway-week1.txt`](docs/captures/gateway-week1.txt).
+
+Full plan for the phase: [`specs/002-phase2-gateway.md`](specs/002-phase2-gateway.md).
+The paper is written alongside it in [`paper/`](paper/).
+
+---
+
 ## Running without Docker
 
 ```bash
@@ -165,7 +201,11 @@ make demo-fast   # keyword stand-in, ~5 s
 | `make capture` | Re-record the run the deck quotes |
 | `make deck` | Rebuild `docs/deck.html` |
 | `make diagram` | Redraw both diagrams from mermaid source |
-| `make phase2-up` | Start Qdrant + Redis (Phase 2 infrastructure) |
+| `make gateway-up` | **Start the gateway** on `127.0.0.1:8080`, no key needed |
+| `make gateway-smoke` | Health, a request, and the log line it wrote |
+| `make gateway-test` | Run the test suite inside the image |
+| `make gateway-logs` / `make gateway-down` | Follow the logs / stop everything |
+| `make phase2-up` | Start Qdrant + Redis (needed from Week 3) |
 
 ---
 
@@ -174,7 +214,7 @@ make demo-fast   # keyword stand-in, ~5 s
 | Phase | Window | Goal | State |
 |---|---|---|---|
 | **1** | 18–22 Aug | Prove the problem is real | **done** |
-| **2** | 23 Aug – 26 Sep | Build the gateway; reproduce the problem on our own running system | not started |
+| **2** | 23 Aug - 26 Sep | Build the gateway; reproduce the problem on our own running system | **week 1 done** |
 | **3** | 27 Sep – 24 Oct | Build the fix; show it beat the old version live | not started |
 | **4** | 25 Oct – 14 Nov | Measure everything properly; write the paper | not started |
 

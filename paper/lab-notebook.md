@@ -55,10 +55,18 @@ The blocking classifier call in Week 2 therefore cannot stall the server, and we
 - One log line per request, complete, with the settings attached.
 - `stream: true` gets a clear refusal instead of a crash, because streaming and caching interact and that has to be designed, not bolted on.
 
+### Then we put it in Docker
+
+- `deploy/Dockerfile.gateway`, `deploy/nginx.conf`, and `gateway` and `nginx` services in compose.
+- `make gateway-up` starts both. `make gateway-smoke` proves the whole path works: nginx to gateway to a reply to a log line on the host disk.
+- The commit is stamped into the image at build time, because inside a container there is no git repo to ask, and every log line has to say which build produced it.
+- The image does not run as root, and it carries no models, so a code change does not rebuild the 370 MB classifier that arrives next week.
+- All 18 tests pass inside the image on Python 3.11, which is the version the project actually targets.
+
 ### What went wrong
 
-- **Docker Desktop would not stay running** on the Mac used for this work. It starts and quits within a minute. Worked around by testing in a temporary Python 3.9 virtual environment. That is fine as a check, but the project targets Python 3.11 and Docker has to work before the gateway image is built. This is the top blocker for Week 2, because Presidio and spaCy are the awkward installs and we do not want to debug them outside a container.
-- The `Makefile` still points at a Windows virtual environment path, which means it only runs on one team member's machine. Phase 2 targets should go through Docker.
+- **Docker Desktop is unreliable on the Mac used for this work.** It started, quit within a minute, and would not come back. The gateway was checked in a temporary Python 3.9 virtual environment instead. It later started on a second attempt and everything above was built and verified properly. Treat it as flaky rather than fixed: if it does this again in Week 2, that is the blocker to solve first, because Presidio and spaCy are the awkward installs and nobody wants to debug those outside a container.
+- The `Makefile` pointed at a Windows virtual environment path, so it only ran on one machine. `PY` is now overridable, and every Phase 2 target goes through Docker instead.
 
 ### Honest state
 

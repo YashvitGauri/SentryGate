@@ -1,0 +1,38 @@
+# The Phase 2 gateway.
+#
+# Small on purpose. The Phase 1 PoC image carries two models and is 2.2 GB.
+# This one carries no models yet. Screening adds them in Week 2, so keeping
+# the layers separate here means a code change does not rebuild the models.
+
+FROM python:3.11-slim
+
+# The running service reports which commit it is, and every log line carries
+# it. Inside a container there is no git repo to ask, so it is passed in.
+ARG BUILD_SHA=unknown
+ENV SENTRYGATE_BUILD_SHA=${BUILD_SHA} \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SENTRYGATE_DATA_DIR=/data
+
+WORKDIR /app
+
+# Dependencies first, so editing app code does not reinstall them.
+COPY requirements-gateway.txt .
+RUN pip install --no-cache-dir -r requirements-gateway.txt
+
+COPY app/ app/
+
+# Do not run as root. The data directory is a mount, so it is chowned here
+# and the volume keeps the ownership.
+RUN useradd --create-home --uid 10001 sentry \
+ && mkdir -p /data \
+ && chown -R sentry:sentry /data /app
+USER sentry
+
+EXPOSE 8000
+
+# No curl in a slim image, so the check uses python.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status==200 else 1)"
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
