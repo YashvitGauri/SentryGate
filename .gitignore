@@ -8,3 +8,8 @@ data/models/
 data/*.jsonl
 eval/figures/
 .pytest_cache/
+data/spend_ledger.json
+
+# Cassettes are recorded replies. They are committed on purpose, so the
+# attack sweeps and the figures can be regenerated with no key and no money.
+!data/cassettes/

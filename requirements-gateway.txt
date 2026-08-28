@@ -1,0 +1,10 @@
+# Phase 2 gateway. The Phase 1 PoC keeps its own file (requirements-poc.txt).
+# Screening (deberta + Presidio) and the cache (Qdrant + Redis) add their own
+# lines in Week 2 and Week 3.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+
+# Tests only.
+pytest==8.3.4
