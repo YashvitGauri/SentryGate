@@ -1,16 +1,16 @@
-# Phase 2 — Gateway + reproduce the bypass on our own system
+# Phase 2 - Gateway + reproduce the bypass on our own system
 
-**Window:** 23 Aug – 26 Sep (5 weeks). **Assessed at:** Progress Eval-1.
+**Window:** 23 Aug - 26 Sep (5 weeks). **Assessed at:** Progress Eval-1.
 **Parent plan:** [`001-introfile.md`](001-introfile.md). This file is the
 implementation-level plan for the Phase 2 rows in it.
 
 | Week | Dates | Ships |
 |---|---|---|
-| 1 | 23–29 Aug | Gateway skeleton — a real request reaches a real model through us |
-| 2 | 30 Aug – 5 Sep | Screening layer — every prompt gets a `Verdict` |
-| 3 | 6–12 Sep | Baseline semantic cache — deliberately vulnerable |
-| 4 | 13–19 Sep | **Reproduce the bypass on our own gateway** — the phase's real result |
-| 5 | 20–26 Sep | Logging completed, figures, demo hardening |
+| 1 | 23-29 Aug | Gateway skeleton - a real request reaches a real model through us |
+| 2 | 30 Aug - 5 Sep | Screening layer - every prompt gets a `Verdict` |
+| 3 | 6-12 Sep | Baseline semantic cache - deliberately vulnerable |
+| 4 | 13-19 Sep | **Reproduce the bypass on our own gateway** - the phase's real result |
+| 5 | 20-26 Sep | Logging completed, figures, demo hardening |
 
 > **Schedule reality:** Week 1 has ~2 days left as this is written. Section
 > "Start here" at the bottom is the shortest path to a Week-1 artifact.
@@ -24,14 +24,14 @@ One sentence for the reviewer:
 > *"On our own running gateway, N% of reworded attacks were served from a
 > poisoned cache entry, and the filter ran zero times while it happened."*
 
-Phase 1 asserted that ordering by construction — `SemanticCache.lookup()` simply
+Phase 1 asserted that ordering by construction - `SemanticCache.lookup()` simply
 never called the filter. Phase 2 has to **earn** the same number on a real
 FastAPI service talking to a real model with a real vector store. Everything
 below exists to make that one sentence defensible.
 
 Secondary, but non-negotiable: the JSONL request log. Every metric in Phases 3
-and 4 — cost saved, p99 latency, ablation deltas, the bypass-vs-hit-ratio
-trade-off chart — is a query over that file. If it is not written correctly from
+and 4 - cost saved, p99 latency, ablation deltas, the bypass-vs-hit-ratio
+trade-off chart - is a query over that file. If it is not written correctly from
 Week 1, those phases have no data source.
 
 ---
@@ -55,7 +55,7 @@ Phase 2 ships with `cache_first` / filter `off`. Phase 3 Week 1 flips one flag
 and adds one Qdrant filter clause. Consequences:
 
 - The baseline-vs-hardened comparison is the *same binary*, same commit, same
-  data — no "you changed other things too" objection.
+  data - no "you changed other things too" objection.
 - Phase 4's ablation table (§ Phase 4 Week 2 of the parent plan) is already
   built. Each flag is one ablation arm.
 
@@ -77,7 +77,7 @@ first appearance.
 ### 4. Providers need a replay mode
 
 Phase 1's proudest property is that the demo runs with the network switched off.
-Week 1 breaks that by design — but the *demo* must not depend on OpenAI being up
+Week 1 breaks that by design - but the *demo* must not depend on OpenAI being up
 and the department Wi-Fi behaving. `providers.py` gets three modes:
 
 ```
@@ -104,7 +104,7 @@ prompts; one bad loop against a frontier model is a real bill.
 Changing these later invalidates already-collected logs, so they are decided
 here, once.
 
-### `Verdict` — computed once at screening, travels with the request
+### `Verdict` - computed once at screening, travels with the request
 
 ```python
 @dataclass(frozen=True)
@@ -123,7 +123,7 @@ class Verdict:
 cheap to populate in Week 2 (keyword/heuristic buckets) and can be upgraded to a
 classifier later without changing the schema.
 
-### Qdrant payload — flat, because Qdrant filters on flat keys
+### Qdrant payload - flat, because Qdrant filters on flat keys
 
 | Key | Type | Why |
 |---|---|---|
@@ -143,7 +143,7 @@ it:** a hit counts only if
 **and** `stored.intent == incoming.intent` **and** (`incoming.risk_level != "high"`
 or re-verification passed).
 
-### JSONL request log — one line per request
+### JSONL request log - one line per request
 
 ```json
 {"ts":"...","request_id":"...","api_key_id":"sha256:8chars",
@@ -163,8 +163,8 @@ or re-verification passed).
 
 Two fields carry disproportionate weight:
 
-- **`screening_ran`** — this is the Week 4 claim, as data.
-- **`config`** — every line self-describes the experiment arm that produced it.
+- **`screening_ran`** - this is the Week 4 claim, as data.
+- **`config`** - every line self-describes the experiment arm that produced it.
   Phase 4 ablations become a `group by config` instead of five separate log files
   someone has to remember the provenance of.
 
@@ -221,14 +221,14 @@ The deck quotes its captured output; touching it invalidates
 
 ---
 
-## Week 1 (23–29 Aug) — Gateway skeleton
+## Week 1 (23-29 Aug) - Gateway skeleton
 
 **Build:** `config.py`, `schemas.py`, `providers.py` (all three modes + spend
 cap), `logging_mw.py` (minimal), `main.py` with `/v1/chat/completions`,
 `/healthz`; `deploy/Dockerfile.gateway`, `deploy/nginx.conf`; compose gains
 `gateway` + `nginx` services alongside the existing `qdrant`/`redis`.
 
-No screening, no cache yet — the request goes straight through to the provider.
+No screening, no cache yet - the request goes straight through to the provider.
 
 **Done when:**
 - [ ] `docker compose up -d` brings up nginx → gateway → (qdrant, redis idle)
@@ -247,9 +247,9 @@ buildable on all three team members' machines.
 
 ---
 
-## Week 2 (30 Aug – 5 Sep) — Screening layer
+## Week 2 (30 Aug - 5 Sep) - Screening layer
 
-**Build:** `screening.py` — the deberta pipeline loaded **once at startup**
+**Build:** `screening.py` - the deberta pipeline loaded **once at startup**
 (never per request), Presidio analyzer, both folded into `Verdict`. Wire into
 `main.py` in front of the provider call. `verdict.py` holds the intent buckets
 and risk rules. Log gains `verdict` and `latency_ms.screen`.
@@ -260,7 +260,7 @@ and risk rules. Log gains `verdict` and `latency_ms.screen`.
 - [ ] `"ignore previous instructions..."` → `403`, score in the header and log
 - [ ] Presidio flags an email/phone in a prompt and sets `has_pii`
 - [ ] screening adds < ~150 ms warm (measure it; it is a paper number)
-- [ ] `tests/test_screening.py` uses a **stub scorer** — the suite must not need
+- [ ] `tests/test_screening.py` uses a **stub scorer** - the suite must not need
       370 MB of weights to run
 
 **Demo artifact:** two live curls, clean vs blocked, with the classifier score.
@@ -271,20 +271,20 @@ pin exact versions into `requirements-gateway.txt` the day it works.
 
 ---
 
-## Week 3 (6–12 Sep) — Baseline semantic cache
+## Week 3 (6-12 Sep) - Baseline semantic cache
 
-**Build:** `cache.py` — two layers: Redis exact-match on `prompt_hash` (free,
+**Build:** `cache.py` - two layers: Redis exact-match on `prompt_hash` (free,
 instant) and Qdrant semantic search on the MiniLM embedding. Collection
 bootstrap on startup (384-dim, cosine). Upsert the full payload from the
 contract above, verdict included. Lookup uses a **plain global threshold, no
-verdict filter** — this is the vulnerable baseline, on purpose, behind the flags
+verdict filter** - this is the vulnerable baseline, on purpose, behind the flags
 from decision 1. Log gains the `cache` block and `latency_ms.embed/cache`.
 
 **Done when:**
 - [ ] first ask ≈ provider latency; same question reworded ≈ tens of ms
 - [ ] `X-SentryGate-Cache: hit` and the similarity are visible on the response
 - [ ] the Qdrant payload contains a full verdict for every entry (inspect one)
-- [ ] a `sentrygate.cache.clear` / `make cache-reset` path exists — experiments
+- [ ] a `sentrygate.cache.clear` / `make cache-reset` path exists - experiments
       need a clean cache between runs, and doing it by hand will corrupt a result
 - [ ] `tests/test_cache.py` runs against a throwaway collection, not the dev one
 
@@ -292,24 +292,24 @@ from decision 1. Log gains the `cache` block and `latency_ms.embed/cache`.
 
 ---
 
-## Week 4 (13–19 Sep) — Reproduce the bypass ⭐
+## Week 4 (13-19 Sep) - Reproduce the bypass ⭐
 
 This is the highest-value week in the phase. Everything before it is
 infrastructure for this number.
 
 **Build:**
-- `attacks/generate_variants.py` — seeds from `deepset/prompt-injections` and
+- `attacks/generate_variants.py` - seeds from `deepset/prompt-injections` and
   `jayavibhav/prompt-injection`; two variant families, kept separate because
   Phase 1 showed they behave completely differently:
-  - **surface** — casing, punctuation, filler words (free for an attacker)
-  - **rewrite** — paraphrases (semantically distant, mostly fail to match)
+  - **surface** - casing, punctuation, filler words (free for an attacker)
+  - **rewrite** - paraphrases (semantically distant, mostly fail to match)
   Emits `data/variants.jsonl` with `{seed_id, family, text}`.
-- `attacks/run_bypass.py` — for each seed: clear cache, poison one entry, fire
+- `attacks/run_bypass.py` - for each seed: clear cache, poison one entry, fire
   every variant **at the live gateway over HTTP**, sweep
   `SIM_THRESHOLD ∈ {0.95 … 0.65}`, and read the gateway's JSONL to confirm
   `screening_ran == false` on each served hit. Emits `data/results.csv`.
 - first chart in `eval/make_figures.py`: bypass rate vs threshold, split by
-  family — the Phase 1 sweep table, now measured end to end.
+  family - the Phase 1 sweep table, now measured end to end.
 
 **Done when:**
 - [ ] a bypass-success-rate number exists, per family, per threshold, over
@@ -322,12 +322,12 @@ infrastructure for this number.
 screening. **This is the slide.**
 
 **Watch out for:** running the sweep in `PROVIDER_MODE=live` is what burns
-money. Poisoning and lookup need no provider call at all — only cache misses do.
+money. Poisoning and lookup need no provider call at all - only cache misses do.
 Run the suite in `replay`, and record the cassettes once.
 
 ---
 
-## Week 5 (20–26 Sep) — Logging completed, figures, hardening
+## Week 5 (20-26 Sep) - Logging completed, figures, hardening
 
 **Build:** cost resolution (per-model price table → `cost_usd` per request),
 token counts from provider responses, p50/p99 latency split by hit/miss in
@@ -359,6 +359,33 @@ call an API.** Dependency-injected scorers and `PROVIDER_MODE=mock` are how.
 
 ---
 
+## The paper, every week
+
+The paper is written alongside the code, not at the end.
+It lives in [`paper/`](../paper/).
+
+The rule: nothing goes in `paper.md` unless something committed already makes it true.
+A number needs a script and a log file.
+A design claim needs the file that implements it.
+Everything else is marked `TODO(week N)` with the evidence it is waiting for.
+
+Each week ends with the same three steps, and they take about ten minutes:
+
+1. Write the week's entry in `paper/lab-notebook.md`, including what broke.
+2. Move anything now proven into `paper/paper.md`.
+3. Delete the `TODO` markers the week just cleared.
+
+Weeks that feed the paper directly:
+
+| Week | Section it fills |
+|---|---|
+| 2 | Implementation, the screening layer. Detection and false positive numbers. |
+| 3 | Implementation, the cache. First latency numbers, hit against miss. |
+| 4 | Results, section 8. The bypass rate on our own gateway. This is the first real result in the paper. |
+| 5 | Background and Related work, written up while the code is quiet. |
+
+---
+
 ## Risks
 
 | Risk | Impact | Mitigation |
@@ -377,16 +404,16 @@ call an API.** Dependency-injected scorers and `PROVIDER_MODE=mock` are how.
 Verdict-filtered lookup, high-risk re-verification, cost-aware routing,
 `output_guard.py`, `rate_limit.py`, Locust, ablations, the paper. Phase 2 that
 tries to also be Phase 3 ends up with a defence that has no measured baseline to
-beat — the baseline number *is* the deliverable.
+beat - the baseline number *is* the deliverable.
 
 ---
 
-## Start here — the next three commits
+## Start here - the next three commits
 
 1. `config.py` + `schemas.py` + `providers.py` in `mock` mode + `main.py` with
    the one route → a request goes in, a canned reply comes out, no keys needed.
 2. `logging_mw.py` writing the JSONL contract with the fields that exist yet →
-   this is what Weeks 2–4 keep extending.
+   this is what Weeks 2-4 keep extending.
 3. `Dockerfile.gateway`, compose `gateway` service, `make gateway-up` /
    `make smoke`, then flip `PROVIDER_MODE=live` once for the "the proxy works"
    screenshot.
