@@ -22,6 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PIPELINE_ORDERS = ("cache_first", "screen_first")
 PROVIDER_MODES = ("mock", "replay", "live")
 ROUTER_MODES = ("fixed", "difficulty")
+SCREENING_SCORERS = ("auto", "stub", "hf")
+CACHE_EMBEDDERS = ("auto", "stub", "hf")
+CACHE_BACKENDS = ("auto", "memory")
 
 
 class ConfigError(RuntimeError):
@@ -87,6 +90,15 @@ class Settings:
     router_mode: str
     sim_threshold: float
 
+    # --- screening (Week 2) -------------------------------------------------
+    injection_threshold: float
+    screening_scorer: str
+
+    # --- cache (Week 3) -----------------------------------------------------
+    embed_model: str
+    cache_embedder: str
+    cache_backend: str
+
     # --- provider ---------------------------------------------------------
     provider_mode: str
     provider_record: bool
@@ -115,6 +127,11 @@ class Settings:
             cache_reverify_high_risk=_bool("CACHE_REVERIFY_HIGH_RISK", False),
             router_mode=_one_of("ROUTER_MODE", "fixed", ROUTER_MODES),
             sim_threshold=_float("SIM_THRESHOLD", 0.85),
+            injection_threshold=_float("INJECTION_THRESHOLD", 0.5),
+            screening_scorer=_one_of("SCREENING_SCORER", "auto", SCREENING_SCORERS),
+            embed_model=_str("EMBED_MODEL", "all-MiniLM-L6-v2"),
+            cache_embedder=_one_of("CACHE_EMBEDDER", "auto", CACHE_EMBEDDERS),
+            cache_backend=_one_of("CACHE_BACKEND", "auto", CACHE_BACKENDS),
             provider_mode=_one_of("PROVIDER_MODE", "mock", PROVIDER_MODES),
             provider_record=_bool("PROVIDER_RECORD", False),
             default_model=_str("DEFAULT_MODEL", "gpt-4o-mini"),
@@ -135,6 +152,10 @@ class Settings:
     def validate(self) -> None:
         if not 0.0 < self.sim_threshold <= 1.0:
             raise ConfigError(f"SIM_THRESHOLD must be between 0 and 1, got {self.sim_threshold}")
+        if not 0.0 < self.injection_threshold <= 1.0:
+            raise ConfigError(
+                f"INJECTION_THRESHOLD must be between 0 and 1, got {self.injection_threshold}"
+            )
         if self.spend_cap_usd_per_day <= 0:
             raise ConfigError("SPEND_CAP_USD_PER_DAY must be greater than 0")
         if self.provider_mode == "live" and not self.openai_api_key:

@@ -39,6 +39,11 @@ services:
       CACHE_REVERIFY_HIGH_RISK: "${CACHE_REVERIFY_HIGH_RISK:-off}"
       ROUTER_MODE: "${ROUTER_MODE:-fixed}"
       SIM_THRESHOLD: "${SIM_THRESHOLD:-0.85}"
+      INJECTION_THRESHOLD: "${INJECTION_THRESHOLD:-0.5}"
+      SCREENING_SCORER: "${SCREENING_SCORER:-auto}"
+      EMBED_MODEL: "${EMBED_MODEL:-all-MiniLM-L6-v2}"
+      CACHE_EMBEDDER: "${CACHE_EMBEDDER:-auto}"
+      CACHE_BACKEND: "${CACHE_BACKEND:-auto}"
       QDRANT_URL: "${QDRANT_URL:-http://qdrant:6333}"
       REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
     # The request log, the cassettes and the spend ledger live here, so they

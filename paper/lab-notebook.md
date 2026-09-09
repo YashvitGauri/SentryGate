@@ -78,3 +78,71 @@ Nothing in the repo currently claims otherwise.
 
 Screening. Load the injection classifier once at startup, add the personal data scan, and produce a verdict for every request.
 The measurable output is a benign prompt that passes and an attack prompt that is refused, with the score visible.
+
+---
+
+## Phase 2, Week 2 (30 Aug to 5 Sep): the screening layer
+
+**Goal for the week.** Every prompt gets a `Verdict`. Attacks get a `403`.
+
+### What we built
+
+- `app/verdict.py`. Frozen `Verdict` shape from the spec, plus keyword intent buckets and risk rules.
+- `app/screening.py`. `KeywordStubScorer` (same cues as the PoC `--fast` mode), `HuggingFaceScorer` (lazy deberta load), Presidio with regex fallback for email/phone, `Screener.screen()` folding both into a `Verdict`. `build_screener()` with `auto` / `stub` / `hf` modes so the gateway always starts.
+- `app/main.py`. Screens every request before the provider call, sets `screening_ran`, `verdict`, `latency_ms.screen`, returns `403 {"code": "prompt_injection"}` on attack. Headers now say `Screened: true`, `Verdict: clean|blocked`, plus the injection score.
+- `app/config.py`. New `INJECTION_THRESHOLD` (default 0.5) and `SCREENING_SCORER` (`auto|stub|hf`).
+- `tests/test_screening.py`. 9 tests on the stub. Old smoke/logging tests updated to expect screened traffic. 27 pass in the gateway image on Python 3.11.
+
+### Decisions worth remembering
+
+- Tests never download weights. The stub is injected, and `SCREENING_SCORER=stub` keeps the lifespan fast.
+- PII flags but does not block. Only `is_injection` returns 403. Blocking on PII would false-positive benign mail.
+- `response_model=None` on the route, because the endpoint returns either an OpenAI body or a JSON error.
+
+### What went wrong
+
+- Host Python is 3.9, which cannot parse `str | None`. Verification runs inside the gateway Docker image (3.11) instead.
+- FastAPI rejects `ChatCompletionResponse | JSONResponse` as a response model. Fixed with `response_model=None`.
+
+### Honest state
+
+- Screening is real on the stub. The deberta weights path is wired (`hf` mode) but the exact `transformers` + `torch` pins and the Presidio/spaCy install are not yet verified in Docker. That is the remaining Week 2 tail.
+- No cache yet. Headers still say `Cache: disabled`.
+
+### Next week
+
+Cache. Redis exact + Qdrant semantic with a plain global threshold, verdict stored but not filtered. The latency drop is the demo.
+
+---
+
+## Phase 2, Week 3 (6 to 12 Sep): the baseline semantic cache
+
+**Goal for the week.** Same question two ways, second one served from cache. Deliberately vulnerable.
+
+### What we built
+
+- `app/cache.py`. `StubEmbedder` (word-hash, no download) + `SentenceTransformerEmbedder` (lazy MiniLM), `MemoryExactStore` / `RedisExactStore`, `MemoryVectorStore` / `QdrantVectorStore`, `SemanticCache` with exact-first then threshold search. Every upsert stores the full verdict payload from the frozen contract. Lookup ignores it, on purpose.
+- `app/main.py`. `cache_first` looks up before screening and serves hits with `screening_ran=False`. `screen_first` screens first, then looks up. Misses screen, call the provider, then store with the verdict. `POST /v1/cache/clear` resets between runs. Hits report `Provider: cache`, `Screened: false`, `Cache: hit`, similarity.
+- `app/config.py`. New `EMBED_MODEL`, `CACHE_EMBEDDER` (`auto|stub|hf`), `CACHE_BACKEND` (`auto|memory`).
+- Infra. `requirements-gateway.txt` gains `sentence-transformers`, `qdrant-client==1.13.0`, `redis`. Dockerfile installs CPU torch first. `make cache-reset` added.
+- `tests/test_cache.py`. 9 tests on memory stores: stub similarity split, payload shape, miss-then-hit, reworded hit, unrelated miss, hit-skips-screening as data, clear, healthz, screen_first arm. 36 pass in the image.
+
+### Decisions worth remembering
+
+- Memory fallback keeps the gateway running with no Qdrant/Redis. `auto` tries the real services, falls back with a reason in `/healthz`.
+- Blocked prompts are never stored. Only provider successes get cached.
+- Exact match returns similarity 1.0 without embedding math.
+
+### What went wrong
+
+- `qdrant-client==1.12.4` does not exist on PyPI. Pinned `1.13.0`, which works against server `v1.12.4`.
+- FastAPI route now returns two shapes, kept honest with `response_model=None` from Week 2.
+
+### Honest state
+
+- Live check on the built image: first ask `miss` with `Screened: true`, reworded ask `hit` with `Screened: false` and similarity 1.0, `POST /v1/cache/clear` returns `{"cleared": 1}`.
+- Real MiniLM and real Qdrant/Redis paths are wired but not yet measured. Default run uses the stub + memory.
+
+### Next week
+
+Week 4, the phase result. Poison one entry, fire variants at the live gateway over HTTP, sweep thresholds, confirm `screening_ran==false` from the JSONL. That number is the slide.

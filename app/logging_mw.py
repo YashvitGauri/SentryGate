@@ -33,7 +33,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 # Paths that are plumbing, not traffic. Logging them would pollute every rate.
-SKIP_PATHS = {"/healthz", "/docs", "/openapi.json", "/redoc", "/favicon.ico"}
+SKIP_PATHS = {"/healthz", "/docs", "/openapi.json", "/redoc", "/favicon.ico", "/v1/cache/clear"}
 
 
 def client_key_id(auth_header: str | None) -> str:

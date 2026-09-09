@@ -157,15 +157,23 @@ What exists today, and what does not:
 | OpenAI-compatible API, nginx in front | done |
 | Model calls, with record and replay | done |
 | One log line per request | done |
-| Safety check | Week 2 |
-| Cache | Week 3 |
+| Safety check | done (Week 2, stub scorer; deberta wired) |
+| Cache | done (Week 3 baseline, deliberately vulnerable) |
 
-The response headers say so on every request:
+The response headers say so on every request. On a miss:
 
 ```
 x-sentrygate-provider: mock
+x-sentrygate-screened: true
+x-sentrygate-cache:    miss
+```
+
+On a hit, the finding, as headers:
+
+```
+x-sentrygate-provider: cache
 x-sentrygate-screened: false
-x-sentrygate-cache:    disabled
+x-sentrygate-cache:    hit
 ```
 
 Recorded output: [`docs/captures/gateway-week1.txt`](docs/captures/gateway-week1.txt).
@@ -206,6 +214,7 @@ make demo-fast   # keyword stand-in, ~5 s
 | `make gateway-test` | Run the test suite inside the image |
 | `make gateway-logs` / `make gateway-down` | Follow the logs / stop everything |
 | `make phase2-up` | Start Qdrant + Redis (needed from Week 3) |
+| `make cache-reset` | Clear the cache between experiments |
 
 ---
 
@@ -214,7 +223,7 @@ make demo-fast   # keyword stand-in, ~5 s
 | Phase | Window | Goal | State |
 |---|---|---|---|
 | **1** | 18–22 Aug | Prove the problem is real | **done** |
-| **2** | 23 Aug - 26 Sep | Build the gateway; reproduce the problem on our own running system | **week 1 done** |
+| **2** | 23 Aug - 26 Sep | Build the gateway; reproduce the problem on our own running system | **weeks 1-3 done, week 4 next** |
 | **3** | 27 Sep – 24 Oct | Build the fix; show it beat the old version live | not started |
 | **4** | 25 Oct – 14 Nov | Measure everything properly; write the paper | not started |
 

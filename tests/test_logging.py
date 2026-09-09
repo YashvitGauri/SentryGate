@@ -18,6 +18,9 @@ from app.logging_mw import client_key_id
 @pytest.fixture
 def gateway(tmp_path, monkeypatch):
     monkeypatch.setenv("PROVIDER_MODE", "mock")
+    monkeypatch.setenv("SCREENING_SCORER", "stub")
+    monkeypatch.setenv("CACHE_EMBEDDER", "stub")
+    monkeypatch.setenv("CACHE_BACKEND", "memory")
     monkeypatch.setenv("SENTRYGATE_DATA_DIR", str(tmp_path))
     get_settings.cache_clear()
     from app.main import app
@@ -63,13 +66,13 @@ def test_the_prompt_itself_is_never_logged(gateway):
     assert read_lines(log_path)[0]["prompt_len"] == len(secret)
 
 
-def test_the_line_says_nothing_was_screened_or_cached_yet(gateway):
+def test_the_line_says_screened_true_and_cache_miss_on_first_ask(gateway):
     client, log_path = gateway
     ask(client)
     line = read_lines(log_path)[0]
-    assert line["screening_ran"] is False
-    assert line["verdict"] is None
-    assert line["cache"]["outcome"] == "disabled"
+    assert line["screening_ran"] is True
+    assert line["verdict"]["is_injection"] is False
+    assert line["cache"]["outcome"] == "miss"
 
 
 def test_every_line_carries_the_settings_that_produced_it(gateway):

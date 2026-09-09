@@ -7,7 +7,7 @@ BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test cache-reset
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -75,6 +75,9 @@ gateway-smoke:  ## Prove it works: health, a real request, and the log line
 
 gateway-test:   ## Run the test suite inside the image
 	docker run --rm -v $(CURDIR):/src -w /src sentrygate-gateway python -m pytest -q
+
+cache-reset:    ## Clean the cache between experiments (never by hand)
+	@curl -fsS -X POST $(GATEWAY)/v1/cache/clear | python3 -m json.tool
 
 
 MMD = problem flow architecture

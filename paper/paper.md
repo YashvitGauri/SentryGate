@@ -199,8 +199,8 @@ The gateway is a FastAPI service that speaks the OpenAI chat completions API, so
 | Settings and experiment switches | `app/config.py` | Done, Week 1 |
 | Model calls, with record and replay | `app/providers.py` | Done, Week 1 |
 | Request log, one line per request | `app/logging_mw.py` | Done, Week 1 |
-| Injection and personal data screening | `app/screening.py` | `TODO(week 2)` |
-| Semantic cache | `app/cache.py` | `TODO(week 3)` |
+| Injection and personal data screening | `app/screening.py` | Done, Week 2 (stub scorer + PII; deberta wired, pins pending) |
+| Semantic cache | `app/cache.py` | Done, Week 3 (baseline, verdict stored not checked) |
 | Attack generation and sweep | `attacks/` | `TODO(week 4)` |
 | Verdict-filtered lookup | `app/cache.py` | `TODO(phase 3)` |
 | Cost-aware routing | `app/router.py` | `TODO(phase 3)` |
@@ -226,11 +226,29 @@ Results can therefore be split by experiment arm after the fact, from the log al
 Model replies are recorded once and replayed from disk afterwards.
 Every experiment in this paper can therefore be re-run with no API key, no network and no cost, and returns the same answers each time.
 
+### 6.4 Status after Week 3
+
+Screening (Week 2) runs on every request before the provider call.
+Each prompt gets a `Verdict` (`app/verdict.py`): injection score against `INJECTION_THRESHOLD` (default 0.5), Presidio PII scan with a regex fallback for email and phone, keyword intent buckets, and a risk level.
+Attacks return `403` with an OpenAI-shaped error object (`{"code": "prompt_injection"}`).
+PII flags the verdict but does not block.
+The running gateway uses a keyword stub scorer, so the suite needs no weights; the deberta path (`SCREENING_SCORER=hf`) is wired but its weights and latency are not yet measured here.
+
+Baseline cache (Week 3) has two layers: exact match on the prompt hash (Redis, or memory fallback) and semantic search on the prompt embedding (Qdrant, or memory fallback).
+Lookup uses a plain global threshold (`SIM_THRESHOLD`, default 0.85) and ignores the stored verdict, on purpose.
+Every upsert stores the full verdict payload (`is_injection`, `has_pii`, `intent`, `risk_level`, `injection_score`) so Phase 3 is a query change, not a re-index.
+In `cache_first` mode a hit returns with `screening_ran=False`; in `screen_first` mode screening always runs.
+`POST /v1/cache/clear` resets between runs.
+36 tests pass in the gateway image with stub scorer and stub embedder; real-model and real-infra numbers are still open.
+
 ---
 
 ## 7. Evaluation
 
 `TODO(week 4)` First numbers. `TODO(phase 4)` Full suite.
+
+The log already records what every metric needs: `screening_ran` and the full `verdict` (Week 2), plus cache `outcome`, `similarity`, `matched_id`, `threshold` and `embed`/`cache` latencies (Week 3).
+What is missing is the Week 4 run that fills them: poisoned entries, variant sweeps, and threshold splits, all read back from that log.
 
 **Datasets.**
 `deepset/prompt-injections` and `jayavibhav/prompt-injection` for attack seeds.
@@ -271,6 +289,7 @@ Written honestly as we find them, not at the end.
 - The Phase 1 numbers come from one seed attack and ten variants. Week 4 replaces them with at least 50 seeds from public datasets.
 - Cache poisoning requires an entry to get in. We measure the case that needs no special access, and discuss the others in the threat model rather than measuring them.
 - The filter we use is one specific public model. A different filter would change the detection numbers, though not the shape of the bypass.
+- Weeks 2 and 3 run on stub scorer and stub embedder with memory stores, so no detection, false-positive, latency, or hit-rate numbers are claimed yet. The deberta weights, MiniLM embeddings, and Redis/Qdrant paths are wired with fallbacks and still need measuring.
 - `TODO(phase 3)` The verdict filter can only be as good as the intent labels. Say how intent is assigned and how often it is wrong.
 
 ---

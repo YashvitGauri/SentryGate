@@ -1,8 +1,8 @@
 # The Phase 2 gateway.
 #
-# Small on purpose. The Phase 1 PoC image carries two models and is 2.2 GB.
-# This one carries no models yet. Screening adds them in Week 2, so keeping
-# the layers separate here means a code change does not rebuild the models.
+# Models are NOT baked in. They download on first use in hf mode, or the stub
+# runs with no download at all. Keeping them out of the image means a code
+# change does not rebuild hundreds of MB.
 
 FROM python:3.11-slim
 
@@ -16,9 +16,13 @@ ENV SENTRYGATE_BUILD_SHA=${BUILD_SHA} \
 
 WORKDIR /app
 
-# Dependencies first, so editing app code does not reinstall them.
+# Torch CPU first, from its own index: MiniLM needs no GPU and the full CUDA
+# wheel would triple the image. Then everything else from PyPI.
 COPY requirements-gateway.txt .
-RUN pip install --no-cache-dir -r requirements-gateway.txt
+RUN pip install --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.5.1 \
+ && pip install --no-cache-dir -r requirements-gateway.txt
 
 COPY app/ app/
 

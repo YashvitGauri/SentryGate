@@ -19,6 +19,9 @@ from app.schemas import ChatMessage, prompt_hash
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("PROVIDER_MODE", "mock")
+    monkeypatch.setenv("SCREENING_SCORER", "stub")
+    monkeypatch.setenv("CACHE_EMBEDDER", "stub")
+    monkeypatch.setenv("CACHE_BACKEND", "memory")
     monkeypatch.setenv("SENTRYGATE_DATA_DIR", str(tmp_path))
     get_settings.cache_clear()
     from app.main import app
@@ -51,10 +54,11 @@ def test_a_request_gets_an_openai_shaped_reply(client):
     assert body["usage"]["total_tokens"] > 0
 
 
-def test_headers_say_nothing_was_screened_or_cached_yet(client):
+def test_headers_say_screened_and_cache_miss_on_first_ask(client):
     headers = ask(client).headers
-    assert headers["X-SentryGate-Screened"] == "false"
-    assert headers["X-SentryGate-Cache"] == "disabled"
+    assert headers["X-SentryGate-Screened"] == "true"
+    assert headers["X-SentryGate-Verdict"] == "clean"
+    assert headers["X-SentryGate-Cache"] == "miss"
     assert headers["X-SentryGate-Provider"] == "mock"
     assert len(headers["X-SentryGate-Request-Id"]) == 32
 
@@ -73,6 +77,9 @@ def test_an_empty_request_is_refused(client):
 
 def test_replay_without_a_recording_says_so(tmp_path, monkeypatch):
     monkeypatch.setenv("PROVIDER_MODE", "replay")
+    monkeypatch.setenv("SCREENING_SCORER", "stub")
+    monkeypatch.setenv("CACHE_EMBEDDER", "stub")
+    monkeypatch.setenv("CACHE_BACKEND", "memory")
     monkeypatch.setenv("SENTRYGATE_DATA_DIR", str(tmp_path))
     get_settings.cache_clear()
     from app.main import app
@@ -86,6 +93,9 @@ def test_replay_without_a_recording_says_so(tmp_path, monkeypatch):
 
 def test_replay_serves_a_recording(tmp_path, monkeypatch):
     monkeypatch.setenv("PROVIDER_MODE", "replay")
+    monkeypatch.setenv("SCREENING_SCORER", "stub")
+    monkeypatch.setenv("CACHE_EMBEDDER", "stub")
+    monkeypatch.setenv("CACHE_BACKEND", "memory")
     monkeypatch.setenv("SENTRYGATE_DATA_DIR", str(tmp_path))
     get_settings.cache_clear()
     prompt = "what is the capital of France?"

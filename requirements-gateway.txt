@@ -1,10 +1,12 @@
 # Phase 2 gateway. The Phase 1 PoC keeps its own file (requirements-poc.txt).
-# Screening (deberta + Presidio) and the cache (Qdrant + Redis) add their own
-# lines in Week 2 and Week 3.
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 httpx==0.28.1
 pydantic==2.10.4
+# Week 3 cache. torch itself comes from the CPU index in Dockerfile.gateway.
+sentence-transformers==3.3.1
+qdrant-client==1.13.0
+redis==5.2.1
 
 # Tests only.
 pytest==8.3.4
