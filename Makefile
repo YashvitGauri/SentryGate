@@ -7,7 +7,7 @@ BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test cache-reset
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test cache-reset live-smoke
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -94,3 +94,10 @@ present:        ## Serve the deck at http://127.0.0.1:8777/deck.html
 
 freeze:
 	$(PY) -m pip freeze > requirements-lock.txt
+
+live-smoke:     ## One real call through the gateway (needs env key, never stored)
+	@test -n "$$OPENAI_API_KEY" || (echo 'Set OPENAI_API_KEY first. Never commit it.' && exit 1)
+	BUILD_SHA=$(BUILD_SHA) PROVIDER_MODE=live OPENAI_API_KEY="$$OPENAI_API_KEY" OPENAI_BASE_URL="$${OPENAI_BASE_URL:-https://agentrouter.org/v1}" DEFAULT_MODEL="$${LIVE_MODEL:-gpt-5.5}" docker compose up -d --build gateway nginx
+	@sleep 6
+	@curl -fsS -D /tmp/sg-live-headers.txt $(GATEWAY)/v1/chat/completions -H 'content-type: application/json' -d '{"model":"'"$${LIVE_MODEL:-gpt-5.5}"'","messages":[{"role":"user","content":"Reply with OK only"}],"max_tokens":5}' | python3 -m json.tool
+	@grep -i x-sentrygate /tmp/sg-live-headers.txt
