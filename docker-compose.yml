@@ -31,6 +31,7 @@ services:
       PROVIDER_MODE: "${PROVIDER_MODE:-mock}"
       PROVIDER_RECORD: "${PROVIDER_RECORD:-off}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
       DEFAULT_MODEL: "${DEFAULT_MODEL:-gpt-4o-mini}"
       SPEND_CAP_USD_PER_DAY: "${SPEND_CAP_USD_PER_DAY:-2.0}"
       # The experiment switches. Phase 2 is the vulnerable baseline.
