@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from app.cache import SemanticCache, build_cache
 from app.config import Settings, get_settings
@@ -21,6 +22,7 @@ from app.logging_mw import JsonlWriter, RequestLogMiddleware
 from app.providers import Provider, ProviderError, build_provider, estimate_tokens
 from app.schemas import (
     ChatCompletionRequest,
+    ChatMessage,
     ChatCompletionResponse,
     ErrorResponse,
     prompt_hash,
@@ -39,9 +41,25 @@ async def lifespan(app: FastAPI):
     app.state.screener, app.state.screening_info = build_screener(settings)
     app.state.cache, app.state.cache_info = build_cache(settings)
     app.state.log_writer = JsonlWriter(settings.log_path)
+    app.state.log_config = runtime_log_config(
+        settings, app.state.screening_info, app.state.cache_info
+    )
     yield
     app.state.provider.close()
     app.state.log_writer.close()
+
+
+def runtime_log_config(settings: Settings, screening_info: dict, cache_info: dict) -> dict:
+    """The settings, plus the parts that actually loaded.
+
+    A stand-in and a real model produce very different numbers. Every log line
+    has to say which one was running, or no result can be trusted.
+    """
+    config = settings.as_log_dict()
+    config["scorer"] = screening_info.get("scorer", "unknown")
+    config["embedder"] = (cache_info.get("embedder") or {}).get("model", "unknown")
+    config["cache_backend"] = cache_info.get("backend", "unknown")
+    return config
 
 
 app = FastAPI(title="SentryGate", version="0.1.0", lifespan=lifespan)
@@ -88,9 +106,10 @@ def healthz() -> dict:
         "default_model": settings.default_model,
         "build_sha": settings.build_sha,
         "log_path": str(settings.log_path),
-        "config": settings.as_log_dict(),
+        "config": getattr(app.state, "log_config", None) or settings.as_log_dict(),
         "screening": getattr(app.state, "screening_info", {"mode": "unknown"}),
         "cache": cache_info,
+        "cache_seed_enabled": settings.allow_cache_seed,
     }
 
 
@@ -100,6 +119,42 @@ def cache_clear() -> dict:
     cleared = app.state.cache.clear()
     app.state.cache_info["size"] = app.state.cache.size()
     return {"cleared": cleared}
+
+
+class SeedRequest(BaseModel):
+    prompt: str = Field(min_length=1)
+    response: str = Field(min_length=1)
+    model: str | None = None
+    # Optional. Without it, the real screener scores the prompt and that
+    # verdict is stored, exactly as a normal miss would store it.
+    verdict: dict | None = None
+
+
+@app.post("/v1/cache/seed")
+def cache_seed(body: SeedRequest) -> JSONResponse:
+    """Plant an entry directly. Test-only, for the Week 4 poisoning experiment.
+
+    The paper's threat model says a poisoned entry gets into the cache somehow.
+    This is how an experiment models that, without pretending the route in
+    matters to what is measured: whether the entry gets served.
+    """
+    settings: Settings = app.state.settings
+    if not settings.allow_cache_seed:
+        # Look exactly like a missing route while it is off.
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    model = body.model or settings.default_model
+    messages = [ChatMessage(role="user", content=body.prompt)]
+    verdict = body.verdict
+    if verdict is None:
+        verdict = app.state.screener.screen(body.prompt).to_dict()
+    entry_id = app.state.cache.store(
+        prompt=body.prompt,
+        prompt_hash=prompt_hash(model, messages),
+        response=body.response,
+        model=model,
+        verdict=verdict,
+    )
+    return JSONResponse(content={"entry_id": entry_id, "verdict": verdict})
 
 
 def _serve_hit(payload: dict, similarity: float, matched_id: str) -> ChatCompletionResponse:

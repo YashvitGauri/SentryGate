@@ -13,3 +13,8 @@ data/spend_ledger.json
 # Cassettes are recorded replies. They are committed on purpose, so the
 # attack sweeps and the figures can be regenerated with no key and no money.
 !data/cassettes/
+
+# Week 4: keep the derived attack set and results, not the bulky regenerables.
+data/week4/raw/
+data/week4/run-*.jsonl
+data/week4/smoke.jsonl

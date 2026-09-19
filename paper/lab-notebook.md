@@ -146,3 +146,54 @@ Cache. Redis exact + Qdrant semantic with a plain global threshold, verdict stor
 ### Next week
 
 Week 4, the phase result. Poison one entry, fire variants at the live gateway over HTTP, sweep thresholds, confirm `screening_ran==false` from the JSONL. That number is the slide.
+
+---
+
+## Phase 2, Week 4 (13 to 19 September): reproduce the bypass on our own gateway
+
+**Goal for the week.** Stop asserting the bypass and measure it, on the real system.
+
+### What we built
+
+- `attacks/generate_variants.py`. Pulls two public datasets, keeps the English attacks, and makes rewordings in two families: lazy edits (fixed keyboard-level rules) and full rewrites (a local T5 paraphraser). Deterministic, so the set is reproducible. Output committed.
+- `attacks/run_bypass.py`. For each attack: clear the cache, plant one poisoned entry, fire every rewording over HTTP, count a bypass only when the poison comes back AND the gateway's own log says the filter never ran.
+- `attacks/sweep.sh`. Restarts the gateway on real models for each of seven thresholds, runs the experiment, then runs the safe-order control arm.
+- `eval/make_figures.py`. Turns the results into the table and the chart. Nothing hand-entered.
+- A test-only seed endpoint (`POST /v1/cache/seed`, off unless `ALLOW_CACHE_SEED=on`), and every log line now names the models that actually loaded.
+- `make variants`, `make bypass`, `make figures`.
+
+### The result
+
+239 seeds, 2,838 rewordings per threshold, real filter, real MiniLM, real Qdrant and Redis.
+
+| Threshold | Lazy | Rewrite | Overall |
+|---|---|---|---|
+| 0.95 | 90% | 2% | 68% |
+| 0.85 | 97% | 28% | 80% |
+| 0.65 | 100% | 86% | 96% |
+
+At 0.85, a setting a real product would use, 97% of lazy rewordings were served the poison with zero filter calls.
+
+### Checks that make it trustworthy
+
+- Exact attack served the poison: 1673/1673.
+- Honest questions served the poison: 0/700.
+- Safe order (filter before cache), same attack: 0% bypass. This proves the order is the cause.
+- Log similarity vs served hit: 0 disagreements.
+
+### What went wrong
+
+- **Docker Desktop needed a manual start again**, as in Week 1. Once up it stayed up for the whole run.
+- **Redis could not bind port 6379**: a separate `shared-redis` container already held it. Made the host port configurable (`REDIS_HOST_PORT`, default now 6380). The gateway talks to Redis over the compose network, so this only affects debugging from the host.
+- **HTTP headers came back lowercased**, and the first runner read them from a case-sensitive dict, so every score read as zero and nothing counted. Fixed by lowercasing header keys. Caught because the smoke test showed exact hits but zero bypasses, which was obviously wrong.
+- **The gateway held a deleted log file open.** I deleted a log mid-run; the open file handle kept writing to the ghost inode, so the runner found no lines. Fixed by having the runner read the gateway's real log path from `/healthz`, and by recreating the gateway per threshold (which reopens the log).
+- **The paraphraser's group-beam-search mode now needs `trust_remote_code=True`** in current transformers, which downloads and runs code from the Hub. We do not turn that on. Plain beam search is deterministic and needs no remote code, so we used that.
+
+### Honest state
+
+- The model reply was the fixed test reply, not a real model call. The bypass is about cache hits, so no model is needed, and this kept the run free and repeatable. A real call is still a Week 5 item.
+- Personal data still uses the simple text check, not Presidio. It does not touch this result, which is about injection.
+
+### Next week
+
+Week 5. A first real model call, the full personal data scanner, cost and speed numbers, and the backup demo.

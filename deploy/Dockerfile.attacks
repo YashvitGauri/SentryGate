@@ -1,0 +1,16 @@
+# Tools for the Week 4 experiment: making attack variants, and drawing charts.
+#
+# Built on the gateway image, so it runs the exact same torch and
+# transformers as the gateway. Only the extras for reading the datasets and
+# drawing figures are added here, so the gateway image stays lean.
+#
+# Build the gateway first:  make gateway-build
+
+FROM sentrygate-gateway
+
+USER root
+COPY requirements-attacks.txt /tmp/requirements-attacks.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-attacks.txt
+USER sentry
+
+WORKDIR /src

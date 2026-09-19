@@ -98,6 +98,9 @@ class Settings:
     embed_model: str
     cache_embedder: str
     cache_backend: str
+    # Test-only. Lets an experiment plant a poisoned entry directly.
+    # Off by default, and the endpoint answers 404 while it is off.
+    allow_cache_seed: bool
 
     # --- provider ---------------------------------------------------------
     provider_mode: str
@@ -132,6 +135,7 @@ class Settings:
             embed_model=_str("EMBED_MODEL", "all-MiniLM-L6-v2"),
             cache_embedder=_one_of("CACHE_EMBEDDER", "auto", CACHE_EMBEDDERS),
             cache_backend=_one_of("CACHE_BACKEND", "auto", CACHE_BACKENDS),
+            allow_cache_seed=_bool("ALLOW_CACHE_SEED", False),
             provider_mode=_one_of("PROVIDER_MODE", "mock", PROVIDER_MODES),
             provider_record=_bool("PROVIDER_RECORD", False),
             default_model=_str("DEFAULT_MODEL", "gpt-4o-mini"),

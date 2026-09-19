@@ -33,7 +33,12 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 # Paths that are plumbing, not traffic. Logging them would pollute every rate.
-SKIP_PATHS = {"/healthz", "/docs", "/openapi.json", "/redoc", "/favicon.ico", "/v1/cache/clear"}
+SKIP_PATHS = {
+    "/healthz", "/docs", "/openapi.json", "/redoc", "/favicon.ico",
+    # Admin calls from experiments. They are not user traffic, and a seed
+    # line would read as screening_ran=false, which looks like a bypass.
+    "/v1/cache/clear", "/v1/cache/seed",
+}
 
 
 def client_key_id(auth_header: str | None) -> str:
@@ -155,7 +160,10 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
             request_id=request.headers.get("x-request-id") or _new_id(),
             ts=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             api_key_id=client_key_id(request.headers.get("authorization")),
-            config=request.app.state.settings.as_log_dict(),
+            # The components that actually loaded, not the ones asked for. In auto
+            # mode a real model can fall back to a stand-in, and the log must say so.
+            config=dict(getattr(request.app.state, "log_config", None)
+                        or request.app.state.settings.as_log_dict()),
         )
         request.state.record = record
 

@@ -157,8 +157,9 @@ What exists today, and what does not:
 | OpenAI-compatible API, nginx in front | done |
 | Model calls, with record and replay | done |
 | One log line per request | done |
-| Safety check | done (Week 2, stub scorer; deberta wired) |
+| Safety check | done (Week 2) |
 | Cache | done (Week 3 baseline, deliberately vulnerable) |
+| Bypass reproduced on the real gateway | done (Week 4) |
 
 The response headers say so on every request. On a miss:
 
@@ -175,6 +176,31 @@ x-sentrygate-provider: cache
 x-sentrygate-screened: false
 x-sentrygate-cache:    hit
 ```
+
+### The Week 4 result
+
+We reproduced the bypass on the running gateway, with the real filter, the real
+embedding model, and real Qdrant and Redis. 239 attacks from public datasets,
+2,838 rewordings each, seven cache settings.
+
+| Cache setting | Lazy edits served the poison | Overall |
+|---|---|---|
+| 0.95 (strictest) | 90% | 68% |
+| 0.85 (typical) | 97% | 80% |
+| 0.65 (loosest) | 100% | 96% |
+
+Every counted bypass has a log line saying the filter never ran. Honest
+questions were never served the poison (0 of 700). With the filter moved in
+front of the cache, the same attacks give **0%**, which proves the order is the
+cause.
+
+```bash
+make bypass      # the full sweep on the real gateway (needs Docker)
+make figures     # rebuild the table and chart from the results
+```
+
+Result table: [`data/week4/table.md`](data/week4/table.md).
+Chart: [`paper/figures/bypass_vs_threshold.png`](paper/figures/bypass_vs_threshold.png).
 
 Recorded output: [`docs/captures/gateway-week1.txt`](docs/captures/gateway-week1.txt).
 
@@ -223,7 +249,7 @@ make demo-fast   # keyword stand-in, ~5 s
 | Phase | Window | Goal | State |
 |---|---|---|---|
 | **1** | 18–22 Aug | Prove the problem is real | **done** |
-| **2** | 23 Aug - 26 Sep | Build the gateway; reproduce the problem on our own running system | **weeks 1-3 done, week 4 next** |
+| **2** | 23 Aug - 26 Sep | Build the gateway; reproduce the problem on our own running system | **weeks 1-4 done, week 5 next** |
 | **3** | 27 Sep – 24 Oct | Build the fix; show it beat the old version live | not started |
 | **4** | 25 Oct – 14 Nov | Measure everything properly; write the paper | not started |
 

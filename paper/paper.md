@@ -23,15 +23,15 @@ We show that this order is a hole.
 On a cache hit, the safety filter is never asked, so the cache can hand out an answer the filter would have blocked.
 
 The attack is cheap.
-In our first experiment, half of the reworded attacks were answered from a poisoned cache entry, and the filter ran zero times.
+On our own running gateway, at a cache setting a real product would use, 97% of lazy rewordings of an attack were served a poisoned answer, and the filter ran zero times.
 The rewordings that worked were the laziest ones: a capital letter, a full stop, one extra word.
 
 We propose verdict-tagged caching.
 The safety result is worked out once, stored next to the cached answer, and checked on every lookup.
 A match on wording alone is no longer enough.
 
-> **Pending · Week 4 and Phase 3**
-> The bypass rate measured on our own running gateway, and the rate after the fix.
+> **Pending · Phase 3**
+> The bypass rate after the fix is turned on, against the same attacks.
 
 ---
 
@@ -93,7 +93,7 @@ If the filter ran first, every request would pay for it, including the ones the 
 So real systems check the cache first.
 That is a sensible engineering choice, and it is the hole.
 
-> **Pending · Week 4**
+> **Pending · Week 5**
 > Both timings measured on our own gateway, so this argument rests on our numbers.
 
 ---
@@ -180,14 +180,12 @@ Every threshold a real product would use lets all of the lazy edits through.
 At the strictest setting, 40% still get through, and the cache has stopped matching normal rephrasings too, so it no longer saves money.
 No single number is both safe and useful.
 
-### 4.2 What this experiment does not yet prove
+### 4.2 The same result on our own gateway
 
-This first experiment is a controlled script.
-The cache never calls the filter because we wrote it that way.
-That matches how real systems are built, but it is not a measurement of a running system.
-
-> **Pending · Week 4**
-> The same experiment on our own gateway, with at least 50 attacks from public datasets, and the "filter ran zero times" claim read from the gateway's request log rather than from our code.
+Phase 1 was a controlled script: the cache never called the filter because we wrote it that way.
+Week 4 repeats it on the real gateway, with real components and public attack data, and the result holds.
+The numbers are in section 8.
+Every counted bypass is backed by the gateway's own log line saying the filter never ran, not by our code.
 
 ---
 
@@ -258,7 +256,7 @@ It runs in Docker, behind nginx, on any machine.
 | One log line per request | **Done** · Week 1 |
 | Safety check: attack score and personal data scan | **Done** · Week 2 |
 | Baseline cache: exact match plus similarity search | **Done** · Week 3 |
-| Attack generator and threshold sweep | Week 4 |
+| Attack generator and threshold sweep | **Done** · Week 4 |
 | Verdict-checked cache lookup, the defence | Phase 3 |
 | Model picker, output check, spend limits | Phase 3 |
 
@@ -300,12 +298,16 @@ In cache-first mode, a hit returns with the log saying the filter did not run.
 That log line is the evidence Week 4 needs.
 
 **Tests.**
-36 automated tests pass in the gateway's Docker image.
+48 automated tests pass in the gateway's Docker image.
 None of them download a model or call an API.
 
-> **Pending · Week 4**
-> Today the gateway runs on light stand-ins: a keyword check in place of the real attack model, a simple text check in place of the full personal data scanner, and an in-memory cache in place of Qdrant and Redis.
-> The real versions are built and switchable, but not yet measured inside the gateway.
+The Week 4 result in section 8 ran on the real components: the real injection filter, the real embedding model, and real Qdrant and Redis.
+Two stand-ins remain, and neither touches that result.
+The personal data scanner still uses a simple text check, because the attack we measure is injection, not personal data.
+The model reply was the fixed test reply, because the bypass is about answers served from the cache, so no model is ever called.
+
+> **Pending · Week 5**
+> A first real model reply through the gateway, and the full personal data scanner, both measured.
 
 ---
 
@@ -332,15 +334,50 @@ Each seed is reworded in two ways, kept apart throughout, because they behave ve
 | Detection rate | Share of attacks the filter catches when it is asked |
 | False alarms | Share of honest questions wrongly blocked |
 
-The request log already records everything these need.
-What is missing is the run that fills it.
+The Week 4 run measured the bypass rate directly. The other measures come in Week 5 and Phase 4.
 
 ---
 
 ## 8. Results
 
-> **Pending · Week 4**
-> The bypass rate on our own gateway.
+### 8.1 The bypass, on our own gateway
+
+We took 239 real attacks from two public datasets, reworded each one, planted one poisoned answer per attack, and fired every rewording at the running gateway.
+The gateway used the real injection filter, the real embedding model, and real Qdrant and Redis.
+That is 2,838 attack rewordings at each threshold.
+
+A bypass is counted only when two things are both true: the poison came back in the reply, and the gateway's own log line for that request says the filter never ran.
+
+| Cache threshold | Lazy edits | Full rewrites | Overall |
+|---|---|---|---|
+| 0.95 (strictest) | 90% | 2% | 68% |
+| 0.90 | 95% | 13% | 75% |
+| 0.85 | 97% | 28% | 80% |
+| 0.80 | 98% | 44% | 85% |
+| 0.75 | 99% | 62% | 90% |
+| 0.65 (loosest) | 100% | 86% | 96% |
+
+![Bypass rate against the cache similarity threshold, on our own gateway. Lazy edits get through at every setting. Full rewrites only match once the cache is loose.](figures/bypass_vs_threshold.png)
+
+The shape is the same as Phase 1, now on a real system and at much larger scale.
+Lazy edits get through at every setting.
+Even at the strictest threshold a real product would dare to use, 90% of them are served the poison, and the filter is never asked.
+Full rewrites only start matching once the cache is loose, because a real paraphrase no longer sounds close enough.
+
+### 8.2 Four checks that make the number trustworthy
+
+| Check | Result | Why it matters |
+|---|---|---|
+| The exact attack is always served the poison | 1673 of 1673 | The experiment is wired correctly. |
+| Confirmed bypasses whose log says the filter never ran | all of them | The claim is read from the gateway's log, not from our code. |
+| Honest questions served the poison | 0 of 700 | Normal users are not caught in the crossfire. |
+| Safe order (filter before cache), same attack | 0% bypass | The order is the cause, not the cache itself. |
+| Log similarity vs served hit | 0 disagreements | The recorded scores match what was actually served. |
+
+The safe-order row is the key one.
+Running the exact same build with the filter moved in front of the cache drops the bypass rate straight to zero.
+Nothing else changed.
+So the bypass is caused by the order, and the fix is to change the order's blind spot, which is what Phase 3 does.
 
 > **Pending · Phase 3**
 > Vulnerable against defended, same attacks, side by side.
@@ -357,13 +394,16 @@ What is missing is the run that fills it.
 
 We write these down as we find them.
 
-- The first experiment uses one seed attack and ten rewordings.
-  Week 4 replaces it with at least 50 seeds from public datasets.
+- The bypass rate is measured with the model reply mocked, because the attack is about answers served from the cache, not model answers.
+  A real model call is a Week 5 item.
 - A poisoned answer has to get into the cache somehow.
   We measure the one route that needs no special access, and discuss the others without measuring them.
 - We use one specific public filter.
   A different filter would change the detection numbers, but not the shape of the bypass.
-- The gateway currently runs on stand-ins for the real models and databases, so we claim no speed, detection or hit-rate numbers from it yet.
+- Personal data screening still uses a simple text check, not the full scanner.
+  It does not affect the injection bypass we measure, and Presidio arrives in Week 5.
+- We have not yet measured speed or cost on the gateway.
+  Those come in Week 5, from the same request log.
 - The defence is only as good as the intent labels it matches on.
   Phase 3 will report how intent is decided and how often it is wrong.
 
@@ -415,18 +455,26 @@ Our claim is that the point where caching and filtering meet in one request path
 - Added a way to reset the cache between experiment runs.
 - 36 tests pass.
 
+**Phase 2, Week 4 · 13 to 19 September · Done**
+
+- Reproduced the bypass on our own running gateway, with the real filter, the real embedding model, and real Qdrant and Redis.
+- Took 239 real attacks from two public datasets, made 2,838 rewordings of them, and swept seven cache settings.
+- At a setting a real product would use, 97% of lazy rewordings were served the poison with the filter never asked.
+- Proved the order is the cause: with the filter moved in front of the cache, the same attacks gave 0% bypass.
+- Every counted bypass is backed by a log line saying the filter never ran. No honest question was ever served the poison.
+
 ---
 
 ## 12. Still left
 
-**Phase 2 · by 26 September**
+**Phase 2 · Week 5, by 26 September**
 
-- **Week 4, the main result of this phase.** Generate rewordings from public attack datasets, poison the cache, fire them at our own gateway, sweep the threshold, and read the bypass rate from the log.
 - **A first real model reply through the gateway.** Two attempts on 9 September failed at the model provider.
   The gateway handled the failure correctly and logged it.
-  A successful call is still to come.
-- **Switch the gateway to the real components.** The real attack model, the full personal data scanner, and Qdrant and Redis, then measure their speed.
-- **Week 5.** Complete the cost numbers in the log, generate the charts from it, redraw the architecture diagram, and record a backup demo.
+  A successful call is still to come. The Week 4 result did not need one, because the bypass is about answers served from the cache.
+- **The full personal data scanner.** Week 4 used a simple text check for personal data. Presidio is wired in and needs installing and measuring.
+- **Cost and speed numbers.** Complete the cost figures in the log, and measure response times for hits and misses.
+- **Polish.** Redraw the architecture diagram to match what runs, and record a backup demo.
 
 **Phase 3 · 27 September to 24 October**
 

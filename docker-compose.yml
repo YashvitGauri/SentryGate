@@ -45,11 +45,17 @@ services:
       EMBED_MODEL: "${EMBED_MODEL:-all-MiniLM-L6-v2}"
       CACHE_EMBEDDER: "${CACHE_EMBEDDER:-auto}"
       CACHE_BACKEND: "${CACHE_BACKEND:-auto}"
+      # Test-only. Week 4 plants its poisoned entries through this.
+      ALLOW_CACHE_SEED: "${ALLOW_CACHE_SEED:-off}"
+      # Each experiment run writes its own log file under data/.
+      LOG_FILE: "${LOG_FILE:-requests.jsonl}"
       QDRANT_URL: "${QDRANT_URL:-http://qdrant:6333}"
       REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
     # The request log, the cassettes and the spend ledger live here, so they
     # survive a restart and can be read from the host without docker cp.
-    volumes: ["./data:/data"]
+    # data/ holds the log, cassettes and ledger. hf_models holds downloaded
+    # model weights, so they survive restarts instead of downloading again.
+    volumes: ["./data:/data", "hf_models:/models"]
     # Direct port for debugging. Normal traffic goes through nginx on 8080.
     ports: ["8000:8000"]
 
@@ -72,7 +78,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: sentrygate-redis
-    ports: ["6379:6379"]
+    # Host port is only for debugging with redis-cli; the gateway talks to
+    # redis over the compose network. Change it if 6379 is already taken.
+    ports: ["127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"]
     command: ["redis-server", "--save", "60", "1"]
     volumes: ["redis_data:/data"]
     profiles: ["phase2"]
@@ -80,3 +88,4 @@ services:
 volumes:
   qdrant_data:
   redis_data:
+  hf_models:

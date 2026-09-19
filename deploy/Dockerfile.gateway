@@ -3,6 +3,8 @@
 # Models are NOT baked in. They download on first use in hf mode, or the stub
 # runs with no download at all. Keeping them out of the image means a code
 # change does not rebuild hundreds of MB.
+# They land in /models, which compose mounts as a volume, so they download
+# once and survive every restart.
 
 FROM python:3.11-slim
 
@@ -12,7 +14,11 @@ ARG BUILD_SHA=unknown
 ENV SENTRYGATE_BUILD_SHA=${BUILD_SHA} \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    SENTRYGATE_DATA_DIR=/data
+    SENTRYGATE_DATA_DIR=/data \
+    HF_HOME=/models \
+    HF_HUB_DISABLE_PROGRESS_BARS=1 \
+    TRANSFORMERS_VERBOSITY=error \
+    TOKENIZERS_PARALLELISM=false
 
 WORKDIR /app
 
@@ -29,8 +35,8 @@ COPY app/ app/
 # Do not run as root. The data directory is a mount, so it is chowned here
 # and the volume keeps the ownership.
 RUN useradd --create-home --uid 10001 sentry \
- && mkdir -p /data \
- && chown -R sentry:sentry /data /app
+ && mkdir -p /data /models \
+ && chown -R sentry:sentry /data /models /app
 USER sentry
 
 EXPOSE 8000

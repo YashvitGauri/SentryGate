@@ -7,7 +7,7 @@ BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test paper-pdf cache-reset live-smoke
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test paper-pdf variants bypass figures cache-reset live-smoke
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -82,6 +82,21 @@ cache-reset:    ## Clean the cache between experiments (never by hand)
 
 paper-pdf:      ## Build paper/SentryGate-paper.pdf from paper/paper.md (needs Chrome + pip install markdown)
 	python3 paper/build_pdf.py
+
+# --- Phase 2 Week 4: reproduce the bypass -----------------------------------
+attacks-build:  ## Build the attack-tools image (datasets + charts, on the gateway image)
+	BUILD_SHA=$(BUILD_SHA) docker compose build gateway
+	docker build -q -f deploy/Dockerfile.attacks -t sentrygate-attacks .
+
+variants: attacks-build  ## Regenerate the attack variants from public datasets
+	docker run --rm -v $(CURDIR):/src -v sentrygate_hf_models:/models -e HF_HOME=/models sentrygate-attacks python attacks/generate_variants.py
+
+bypass: attacks-build   ## Run the full sweep on the real gateway (the Phase 2 result)
+	bash attacks/sweep.sh
+
+figures: attacks-build  ## Rebuild the table and chart from the results
+	docker run --rm -v $(CURDIR):/src -w /src sentrygate-attacks python eval/make_figures.py
+
 
 MMD = problem flow architecture
 

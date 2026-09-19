@@ -1,0 +1,5 @@
+# Week 4 experiment tools, on top of requirements-gateway.txt.
+# Reads the Hugging Face datasets, which are published as parquet.
+pyarrow==18.1.0
+# Figures for the paper.
+matplotlib==3.9.4

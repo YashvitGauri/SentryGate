@@ -1,0 +1,36 @@
+{
+  "random_seed": 20260919,
+  "sources": {
+    "deepset/prompt-injections [train]": {
+      "file": "data/week4/raw/deepset__prompt-injections__train.parquet",
+      "sha256": "2e10bc7ab30f542c97e4e83e2a5683000b5057d25ec10908784c631d44124c04"
+    },
+    "deepset/prompt-injections [test]": {
+      "file": "data/week4/raw/deepset__prompt-injections__test.parquet",
+      "sha256": "39ac797cabc157eeed58435a08593b2952bb6cb16fc394a2d383f447cc7b246e"
+    },
+    "jayavibhav/prompt-injection [test]": {
+      "file": "data/week4/raw/jayavibhav__prompt-injection__test.parquet",
+      "sha256": "c4fc0cd53add1c3b96269fdf9f237e45b85c7cf959dc068d346712df39521005"
+    }
+  },
+  "paraphraser": {
+    "model": "humarin/chatgpt_paraphraser_on_T5_base",
+    "decoding": "beam search, 5 beams, no sampling"
+  },
+  "filters": {
+    "chars": [
+      20,
+      400
+    ],
+    "deepset": "label=1, English by word count",
+    "jayavibhav": "label=1, random 100"
+  },
+  "counts": {
+    "seeds": 239,
+    "controls": 100,
+    "exact": 239,
+    "lazy": 2124,
+    "rewrite": 714
+  }
+}
