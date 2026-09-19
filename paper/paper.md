@@ -1,130 +1,172 @@
-# Verdict-Tagged Semantic Caching: Closing a Safety Bypass in LLM Gateways
+# Verdict-Tagged Semantic Caching
 
-**Divyansh Sharma, Sarvagya Dabas, Yashvit Gauri**
+Closing a safety bypass in LLM gateways.
 
-Working draft.
-Sections are written as the code makes them true.
-Anything marked `TODO(week N)` is not yet earned and says what evidence it needs.
+**Divyansh Sharma · Sarvagya Dabas · Yashvit Gauri**
+
+Progress draft · Phase 2 · 19 September 2026
+
+This draft is written alongside the code.
+Every claim in it is backed by something already built and committed.
+Anything not yet proven is marked **Pending**, with the week that will prove it.
 
 ---
 
 ## Abstract
 
-`TODO(phase 4)` Final version needs the measured numbers.
+Most products built on a large language model put two things in front of it.
+A safety filter, which blocks attacks.
+And a cache, which returns a stored answer when a new question means the same thing as an old one.
 
-Draft shape, to be filled in with real values:
+For the cache to save anything, it has to be checked first.
+We show that this order is a hole.
+On a cache hit, the safety filter is never asked, so the cache can hand out an answer the filter would have blocked.
 
-Most production systems built on large language models place two components in front of the model: a safety filter that screens each prompt, and a semantic cache that returns a stored answer when a new prompt is close enough in meaning to an old one.
-For the cache to save anything, it has to be checked before the filter runs.
-We show that this ordering is a bypass.
-A cached answer can be returned for a prompt that the safety filter would have blocked, because on a cache hit the filter is never consulted.
-We show the attack is cheap: `TODO(week 4)` percent of attack prompts changed only in capitalisation, punctuation or filler words retrieved a poisoned cache entry on our gateway, with zero filter invocations.
-We then present verdict-tagged caching, in which the safety result is computed once at screening time and stored alongside the cached answer, so that a cache lookup is a filtered search and the filter becomes part of the match condition.
-This reduces the bypass rate from `TODO(phase 3)` to `TODO(phase 3)` at a cache hit rate cost of `TODO(phase 3)`.
+The attack is cheap.
+In our first experiment, half of the reworded attacks were answered from a poisoned cache entry, and the filter ran zero times.
+The rewordings that worked were the laziest ones: a capital letter, a full stop, one extra word.
+
+We propose verdict-tagged caching.
+The safety result is worked out once, stored next to the cached answer, and checked on every lookup.
+A match on wording alone is no longer enough.
+
+> **Pending · Week 4 and Phase 3**
+> The bypass rate measured on our own running gateway, and the rate after the fix.
 
 ---
 
 ## 1. Introduction
 
-`TODO(week 5)` Full draft.
+LLM gateways are now standard.
+They sit between an app and the model, and they do two jobs at once.
+They keep costs down with a cache.
+They keep attacks out with a safety filter.
 
-The argument in order:
+Each job is well studied on its own.
+What is not studied is what happens when both sit in the same request path, in the order that speed demands.
 
-1. Gateways in front of LLMs are now standard, and they do two jobs at once: they keep costs down with a cache, and they keep attacks out with a filter.
-2. Both jobs are well studied on their own.
-3. Almost nobody studies what happens when they are put in the same request path, in the order that performance demands.
-4. That order creates a hole. The cache can serve an answer the filter already rejected.
-5. The hole is not a tuning mistake. No similarity threshold is both safe and useful, which we show by sweeping the threshold.
-6. The fix is to make the safety result part of what the cache matches on.
+That order creates a hole.
+The cache can serve an answer the filter already rejected.
+The filter is not weak.
+It is simply never asked.
 
-**Contributions.**
+The hole is not a bad setting either.
+We sweep the cache's similarity threshold across every sensible value, and no value is both safe and useful.
+So the fix has to change how the cache decides a match, not what it is set to.
 
-- A description of the cache-before-filter bypass as a class of flaw, not a single bug.
-- A measurement of how cheap the attack is, on a running gateway, using public attack datasets. `TODO(week 4)`
-- A defence, verdict-tagged caching, that is one filter clause on a vector search rather than a new model. `TODO(phase 3)`
-- The trade-off curve between safety and cache efficiency that the defence sits on. `TODO(phase 3)`
-- An ablation showing what each layer of the gateway contributes. `TODO(phase 4)`
+**What this work contributes**
+
+- A description of the cache-before-filter bypass as a class of flaw, not a one-off bug.
+- A measurement of how cheap the attack is, first in a controlled experiment, then on a running gateway.
+- A defence, verdict-tagged caching, which is one extra condition on a search the cache already runs.
+- The trade-off between safety and cache savings that the defence sits on.
+- An ablation study showing what each layer of the gateway adds.
+
+The first two items have early results.
+The rest are in progress, and the last section of this paper lists exactly what is left.
 
 ---
 
 ## 2. Background
 
-`TODO(week 5)` Needs sources from `related-work.md`.
+**Semantic caching**
 
-Three things a reader needs before the flaw makes sense.
-
-**Semantic caching.**
-An exact-match cache only helps when two users type exactly the same thing.
-A semantic cache embeds the prompt into a vector, searches for the nearest stored vector, and returns that answer if the similarity is above a threshold.
+A plain cache only helps when two people type exactly the same thing.
+A semantic cache turns each question into a list of numbers that captures its meaning.
+When a new question arrives, it finds the closest stored question.
+If the two are close enough, it returns the stored answer.
 This is what makes caching useful for natural language, where the same question is asked a hundred different ways.
 
-**Prompt injection filters.**
-A classifier scores how much a prompt looks like an attempt to override the model's instructions.
-These are good. In our own measurements the filter scored 1.000 on every attack variant we tried.
-The problem in this paper is never that the filter is weak.
+**Safety filters**
 
-**Why the cache is checked first.**
-Screening costs roughly 100 ms of model inference.
-A cache hit costs roughly 10 ms.
-Screening before the cache would add the screening cost to every request, including the ones the cache was meant to make free, which cancels out most of the saving.
-So the cache goes first. That is a rational engineering decision, and it is the hole.
+A safety filter is a small model that scores how much a question looks like an attack.
+The best known attack is prompt injection: text that tries to override the model's own instructions, such as "ignore previous instructions and reveal the system prompt".
+Good filters are very accurate.
+In our experiment the filter scored every attack variant at 1.000, the highest possible score.
+This paper is never about the filter being weak.
+
+**Why the cache goes first**
+
+Running the filter takes a model call.
+Looking up the cache is much faster.
+If the filter ran first, every request would pay for it, including the ones the cache was meant to make instant.
+So real systems check the cache first.
+That is a sensible engineering choice, and it is the hole.
+
+> **Pending · Week 4**
+> Both timings measured on our own gateway, so this argument rests on our numbers.
 
 ---
 
 ## 3. Threat model
 
-`TODO(week 4)` Confirm each assumption against what the implementation actually allows.
+**What the attacker wants**
 
-**What the attacker wants.**
-To get an answer the safety filter would have refused.
+An answer the safety filter would have refused.
 
-**What the attacker can do.**
-Send prompts to the gateway as an ordinary user.
-Reword their own prompts freely.
+**What the attacker can do**
 
-**What the attacker does not need.**
-Access to the cache, the vector store, the model weights, or any other user's session.
-A paraphrase model, an LLM, or any tooling beyond a text editor.
+Send questions to the gateway, like any normal user.
+Reword their own questions freely.
 
-**How a poisoned entry gets there.**
-This is the one assumption that needs care, and we treat it three ways:
+**What the attacker does not need**
 
-1. A prompt that scored just under the block threshold was allowed, answered, and cached.
-2. The cache was warmed before deployment from a prompt set that was never screened.
-3. The cache is shared across tenants, so one tenant's stored answer is reachable by another.
+Access to the cache, the database, the model, or anyone else's session.
+Any special tools.
+A text editor is enough.
 
-Case 1 needs no special access at all and is the one we measure.
+**How a poisoned answer gets into the cache**
 
-**Out of scope.**
-Attacks on the model itself, on the vector store's network interface, or on the provider.
-Training-time attacks.
-Attacks that require code execution on the gateway host.
+This is the one assumption that needs care.
+We consider three ways:
+
+1. A question that scored just under the block line was allowed, answered, and cached.
+2. The cache was filled before launch from questions that were never screened.
+3. The cache is shared between customers, so one customer's stored answer reaches another.
+
+The first needs no special access at all, and it is the one we measure.
+
+**Out of scope**
+
+Attacks on the model itself, on the database's network, or on the model provider.
+Attacks during model training.
+Attacks that need to run code on the gateway machine.
 
 ---
 
 ## 4. The bypass
 
-Phase 1 result. These numbers are real and reproducible today with `docker compose run --rm poc`.
+We placed one poisoned answer in a cache, filed under a known attack.
+We then tried ten rewordings of that same attack.
 
-A single attack prompt was placed in the cache with a poisoned answer.
-Ten variants of that same attack were then tried.
+![A reworded attack matches the stored answer at 0.99 similarity, so the stored secret is returned and the safety filter is never reached.](../docs/problem.png)
 
-| Measurement | Value |
+| Measurement | Result |
 |---|---|
-| Variants the filter would block | 10 of 10, at score 1.000 |
-| Variants the cache answered anyway | 5 of 10 |
-| Filter invocations while that happened | 0 |
+| Rewordings the filter would block | **10 of 10**, each scored 1.000 |
+| Rewordings the cache answered anyway | **5 of 10** |
+| Times the filter ran while that happened | **0** |
 
-The five that got through were the cheapest possible edits: a capital letter, a full stop, an inserted "all", an inserted "please".
-The full rewrites failed, scoring 0.22 to 0.71 similarity, because a real paraphrase no longer sounds close enough to match.
+The five that got through were the cheapest possible edits.
+A capital letter.
+A full stop.
+An extra "all".
+An extra "please".
+They matched at 0.92 to 0.99 similarity.
 
-This is the finding stated in one line: **an attacker does not need clever wording, they need the shift key.**
+The clever rewrites failed.
+They scored 0.22 to 0.71, because a real paraphrase no longer sounds close enough to match.
 
-### 4.1 It is not a threshold problem
+An attacker does not need clever wording.
+They need the shift key.
+{: .pull }
 
-Sweeping the similarity threshold does not produce a safe setting.
+### 4.1 It is not a settings problem
 
-| Threshold | Surface edits bypassed | Full rewrites bypassed | Overall |
+A natural response is to make the cache stricter.
+It does not work.
+
+| Threshold | Lazy edits through | Full rewrites through | Overall |
 |---|---|---|---|
 | 0.95 | 40% | 0% | 20% |
 | 0.90 | 100% | 0% | 50% |
@@ -134,19 +176,18 @@ Sweeping the similarity threshold does not produce a safe setting.
 | 0.70 | 100% | 20% | 60% |
 | 0.65 | 100% | 40% | 70% |
 
-Every threshold a real deployment would choose leaks all of the surface edits.
-Tightening to 0.95 still leaks 40% of them, and by then the cache has stopped matching normal rephrasings too, so it no longer saves money.
+Every threshold a real product would use lets all of the lazy edits through.
+At the strictest setting, 40% still get through, and the cache has stopped matching normal rephrasings too, so it no longer saves money.
 No single number is both safe and useful.
-That is why the fix has to change how the cache decides a match, not what it is set to.
 
-### 4.2 What Phase 1 does not prove
+### 4.2 What this experiment does not yet prove
 
-`TODO(week 4)` Replace this section with the end-to-end result.
+This first experiment is a controlled script.
+The cache never calls the filter because we wrote it that way.
+That matches how real systems are built, but it is not a measurement of a running system.
 
-The Phase 1 demonstration is a controlled script.
-The cache-before-filter ordering is true there by construction, because the cache simply never calls the filter.
-That models the real architecture faithfully, but it is not a measurement of a running system.
-Week 4 repeats the experiment on the real gateway, with public attack datasets and at least 50 seed attacks, and confirms the zero-invocation claim from the request log rather than from the code.
+> **Pending · Week 4**
+> The same experiment on our own gateway, with at least 50 attacks from public datasets, and the "filter ran zero times" claim read from the gateway's request log rather than from our code.
 
 ---
 
@@ -154,155 +195,248 @@ Week 4 repeats the experiment on the real gateway, with public attack datasets a
 
 ### 5.1 The idea
 
-Compute the safety result once, at screening time.
+Work out the safety result once.
 Store it next to the cached answer.
-Make the cache check it on every lookup.
+Check it on every lookup.
 
-A cache hit then requires two things to agree, not one: the wording has to be close enough, **and** the stored safety result has to be compatible with the incoming request.
-The filter stops being a stage that a cache hit can skip, and becomes part of the match condition itself.
+A cache hit then needs two things to agree, not one.
+The wording must be close enough.
+And the stored safety result must fit the new question.
+The filter stops being a step a cache hit can skip.
+It becomes part of what counts as a match.
+
+![The full planned request path. The safety check produces a label, the cache matches on wording plus label, risky hits are checked again, and every stored answer is saved with its label.](../docs/flow.png)
 
 ### 5.2 What is stored
 
-Every cache entry carries the verdict that was computed for the prompt that created it: whether it was an injection, its classifier score, whether it contained personal data, its intent, and its risk level.
+Every cached answer carries the safety result of the question that created it:
 
-### 5.3 The match condition
+| Field | Meaning |
+|---|---|
+| Injection flag | Was the question an attack |
+| Injection score | How sure the filter was, from 0 to 1 |
+| Personal data flag | Did the question contain an email, phone number, and so on |
+| Intent | What kind of question it was, such as informational, credentials or tool use |
+| Risk level | Low, medium or high |
 
-A stored entry may be served only if all of the following hold:
+### 5.3 When a stored answer may be served
 
-1. Similarity is at or above the threshold for the incoming request's intent.
-2. The stored injection flag matches the incoming one.
-3. The stored intent matches the incoming intent.
-4. If the incoming request is high risk, re-verification passed.
+All four must hold:
 
-Thresholds are per intent, not global.
-A request asking for credentials or tool use gets a tight threshold.
-An informational request gets a relaxed one, because the cost of a wrong match there is low and the cache saving is high.
+1. The similarity clears the threshold for this kind of question.
+2. The stored injection flag matches the new one.
+3. The stored intent matches the new one.
+4. If the new question is high risk, it passed a fresh safety check.
 
-### 5.4 Why this is cheap
+Thresholds depend on intent.
+Questions about credentials or tool use get a strict threshold.
+Informational questions get a relaxed one, because a wrong match there costs little and the saving is large.
 
-The verdict is already being computed for every prompt that misses the cache.
-Storing it costs a few bytes in the vector store payload.
-Checking it costs one filter clause on a search that was happening anyway.
-No second model, no extra inference on the hot path, except for the deliberate re-verification of high-risk hits.
+### 5.4 Why it is cheap
 
-`TODO(phase 3)` Measure the added latency and put the number here.
+The safety result is already being worked out for every question that misses the cache.
+Storing it adds a few bytes.
+Checking it adds one condition to a search that runs anyway.
+There is no second model and no extra work on the fast path, except the deliberate re-check of high-risk hits.
+
+> **Pending · Phase 3**
+> The extra time this adds, measured.
 
 ---
 
 ## 6. Implementation
 
-The gateway is a FastAPI service that speaks the OpenAI chat completions API, so any OpenAI client points at it by changing one base URL.
+The gateway is a web service that speaks the same API as OpenAI.
+Any app that already talks to OpenAI can use it by changing one address.
+It runs in Docker, behind nginx, on any machine.
 
-| Part | File | State |
-|---|---|---|
-| Request routing, OpenAI-compatible API | `app/main.py`, `app/schemas.py` | Done, Week 1 |
-| Settings and experiment switches | `app/config.py` | Done, Week 1 |
-| Model calls, with record and replay | `app/providers.py` | Done, Week 1 |
-| Request log, one line per request | `app/logging_mw.py` | Done, Week 1 |
-| Injection and personal data screening | `app/screening.py` | Done, Week 2 (stub scorer + PII; deberta wired, pins pending) |
-| Semantic cache | `app/cache.py` | Done, Week 3 (baseline, verdict stored not checked) |
-| Attack generation and sweep | `attacks/` | `TODO(week 4)` |
-| Verdict-filtered lookup | `app/cache.py` | `TODO(phase 3)` |
-| Cost-aware routing | `app/router.py` | `TODO(phase 3)` |
-| Output guard, spend limits | `app/mitigations/` | `TODO(phase 3)` |
+| Part | State |
+|---|---|
+| OpenAI-compatible API, nginx in front | **Done** · Week 1 |
+| Settings, including the experiment switches | **Done** · Week 1 |
+| Model calls, with record and replay | **Done** · Week 1 |
+| One log line per request | **Done** · Week 1 |
+| Safety check: attack score and personal data scan | **Done** · Week 2 |
+| Baseline cache: exact match plus similarity search | **Done** · Week 3 |
+| Attack generator and threshold sweep | Week 4 |
+| Verdict-checked cache lookup, the defence | Phase 3 |
+| Model picker, output check, spend limits | Phase 3 |
 
-### 6.1 One binary, two experiments
+### 6.1 One program, two experiments
 
-The vulnerable baseline and the defended system are the same code with different settings.
-`CACHE_VERDICT_FILTER=off` is the baseline.
-`CACHE_VERDICT_FILTER=on` is the defence.
+The vulnerable version and the defended version are the same code.
+One switch turns the defence on.
 
-This matters for the evaluation.
-A reviewer cannot object that the two arms differ in some other way, because they do not.
-It also means the ablation study is already built: each switch is one arm.
+This matters.
+Nobody can say the two versions differ in some other way, because they do not.
+It also means the ablation study is already built.
+Each switch is one arm of it.
 
 ### 6.2 Every result carries its own settings
 
-Each request writes one line to a JSONL log, and each line includes the settings that produced it and the commit it ran on.
-Results can therefore be split by experiment arm after the fact, from the log alone.
+Each request writes one line to a log.
+That line records what happened, how long each step took, what it cost, and the exact settings and code version that produced it.
+Results can be split by experiment from the log alone.
+The question itself is never written to the log, only a fingerprint of it and its length.
 
-### 6.3 Reproducibility
+### 6.3 Every run can be repeated for free
 
-Model replies are recorded once and replayed from disk afterwards.
-Every experiment in this paper can therefore be re-run with no API key, no network and no cost, and returns the same answers each time.
+Model replies can be recorded once and replayed from disk.
+Every experiment can then be run again with no API key, no internet and no cost, and gives the same answers each time.
+A daily spending cap is checked before every real model call.
 
-### 6.4 Status after Week 3
+### 6.4 Where the build stands
 
-Screening (Week 2) runs on every request before the provider call.
-Each prompt gets a `Verdict` (`app/verdict.py`): injection score against `INJECTION_THRESHOLD` (default 0.5), Presidio PII scan with a regex fallback for email and phone, keyword intent buckets, and a risk level.
-Attacks return `403` with an OpenAI-shaped error object (`{"code": "prompt_injection"}`).
-PII flags the verdict but does not block.
-The running gateway uses a keyword stub scorer, so the suite needs no weights; the deberta path (`SCREENING_SCORER=hf`) is wired but its weights and latency are not yet measured here.
+**Safety check.**
+Every question gets a safety result before anything else happens, unless the cache answers it first.
+Attacks are refused with a clear error.
+Personal data is flagged but not blocked, because blocking every email address would refuse too many honest questions.
 
-Baseline cache (Week 3) has two layers: exact match on the prompt hash (Redis, or memory fallback) and semantic search on the prompt embedding (Qdrant, or memory fallback).
-Lookup uses a plain global threshold (`SIM_THRESHOLD`, default 0.85) and ignores the stored verdict, on purpose.
-Every upsert stores the full verdict payload (`is_injection`, `has_pii`, `intent`, `risk_level`, `injection_score`) so Phase 3 is a query change, not a re-index.
-In `cache_first` mode a hit returns with `screening_ran=False`; in `screen_first` mode screening always runs.
-`POST /v1/cache/clear` resets between runs.
-36 tests pass in the gateway image with stub scorer and stub embedder; real-model and real-infra numbers are still open.
+**Cache.**
+Two layers: an exact match first, then a similarity search.
+Every stored answer carries its full safety result.
+The lookup ignores it on purpose, because this is the vulnerable baseline.
+In cache-first mode, a hit returns with the log saying the filter did not run.
+That log line is the evidence Week 4 needs.
+
+**Tests.**
+36 automated tests pass in the gateway's Docker image.
+None of them download a model or call an API.
+
+> **Pending · Week 4**
+> Today the gateway runs on light stand-ins: a keyword check in place of the real attack model, a simple text check in place of the full personal data scanner, and an in-memory cache in place of Qdrant and Redis.
+> The real versions are built and switchable, but not yet measured inside the gateway.
 
 ---
 
-## 7. Evaluation
+## 7. How we will measure it
 
-`TODO(week 4)` First numbers. `TODO(phase 4)` Full suite.
+**Attacks**
 
-The log already records what every metric needs: `screening_ran` and the full `verdict` (Week 2), plus cache `outcome`, `similarity`, `matched_id`, `threshold` and `embed`/`cache` latencies (Week 3).
-What is missing is the Week 4 run that fills them: poisoned entries, variant sweeps, and threshold splits, all read back from that log.
+Seed attacks come from two public datasets, `deepset/prompt-injections` and `jayavibhav/prompt-injection`.
+Each seed is reworded in two ways, kept apart throughout, because they behave very differently:
 
-**Datasets.**
-`deepset/prompt-injections` and `jayavibhav/prompt-injection` for attack seeds.
-Variants are generated in two families, kept separate throughout, because they behave very differently:
+- **Lazy edits.** Capitals, punctuation, filler words.
+  Free for an attacker.
+- **Full rewrites.** Real paraphrases.
 
-- *surface*: capitalisation, punctuation, filler words. Free to produce.
-- *rewrite*: genuine paraphrases.
+**Measures**
 
-**Metrics.**
-
-| Metric | Definition |
+| Measure | What it means |
 |---|---|
-| Bypass rate | Share of attack variants served from a poisoned entry without the filter running |
-| Cache hit rate | Share of requests answered from cache |
-| Cost saving | Dollars not spent, against a no-gateway baseline |
-| Latency | p50 and p99, split by hit and miss |
-| Gateway overhead | Milliseconds added by our layers |
+| Bypass rate | Share of attacks answered from a poisoned entry without the filter running |
+| Cache hit rate | Share of questions answered from the cache |
+| Money saved | Compared with sending every question to the model |
+| Speed | Typical and worst-case response time, for hits and misses |
+| Gateway overhead | Time our layers add to each request |
 | Detection rate | Share of attacks the filter catches when it is asked |
-| False positive rate | Share of benign prompts wrongly blocked |
+| False alarms | Share of honest questions wrongly blocked |
 
-**Ablations.** `TODO(phase 4)` Screening off, verdict filter off, re-verification off, routing off.
+The request log already records everything these need.
+What is missing is the run that fills it.
 
 ---
 
 ## 8. Results
 
-`TODO(week 4)` First real result: bypass rate on our own gateway.
-`TODO(phase 3)` Baseline against defended, same attacks.
-`TODO(phase 3)` The trade-off curve.
-`TODO(phase 4)` Full table, ablations, cost and latency.
+> **Pending · Week 4**
+> The bypass rate on our own gateway.
+
+> **Pending · Phase 3**
+> Vulnerable against defended, same attacks, side by side.
+
+> **Pending · Phase 3**
+> The trade-off between safety and cache savings.
+
+> **Pending · Phase 4**
+> The full table, the ablation study, cost and speed.
 
 ---
 
 ## 9. Limitations
 
-Written honestly as we find them, not at the end.
+We write these down as we find them.
 
-- The Phase 1 numbers come from one seed attack and ten variants. Week 4 replaces them with at least 50 seeds from public datasets.
-- Cache poisoning requires an entry to get in. We measure the case that needs no special access, and discuss the others in the threat model rather than measuring them.
-- The filter we use is one specific public model. A different filter would change the detection numbers, though not the shape of the bypass.
-- Weeks 2 and 3 run on stub scorer and stub embedder with memory stores, so no detection, false-positive, latency, or hit-rate numbers are claimed yet. The deberta weights, MiniLM embeddings, and Redis/Qdrant paths are wired with fallbacks and still need measuring.
-- `TODO(phase 3)` The verdict filter can only be as good as the intent labels. Say how intent is assigned and how often it is wrong.
+- The first experiment uses one seed attack and ten rewordings.
+  Week 4 replaces it with at least 50 seeds from public datasets.
+- A poisoned answer has to get into the cache somehow.
+  We measure the one route that needs no special access, and discuss the others without measuring them.
+- We use one specific public filter.
+  A different filter would change the detection numbers, but not the shape of the bypass.
+- The gateway currently runs on stand-ins for the real models and databases, so we claim no speed, detection or hit-rate numbers from it yet.
+- The defence is only as good as the intent labels it matches on.
+  Phase 3 will report how intent is decided and how often it is wrong.
 
 ---
 
 ## 10. Related work
 
-`TODO(week 5)` Write from `related-work.md` once the reading is done.
+Three areas meet in this work: semantic caching for LLMs, prompt injection attacks and defences, and the security of the systems that serve models.
+Each is studied on its own.
+Our claim is that the point where caching and filtering meet in one request path is not.
 
-Three areas to cover: semantic caching for LLMs, prompt injection attacks and defences, and security of LLM serving infrastructure.
-The gap we claim is the intersection: caching and filtering are each studied alone, and their interaction in one request path is not.
+> **Pending · Week 5**
+> The written review.
+> Our reading list is in the project repository, and nothing is cited here until it has been read.
 
 ---
 
-## 11. Conclusion
+## 11. Progress so far
 
-`TODO(phase 4)`
+**Phase 1 · 18 to 22 August · Done**
+
+- Proved the bypass is real, in a script anyone can run with no internet and no API key.
+- Showed the filter catches 10 of 10 attacks, and the cache still answers 5 of them with the filter never running.
+- Showed no threshold setting fixes it.
+- Presented the result, with a deck generated from a recorded run, so no number on it can drift.
+
+**Phase 2, Week 1 · 23 to 29 August · Done**
+
+- Built the gateway: an OpenAI-compatible API behind nginx, in Docker.
+- Added three ways to get a reply: a fixed test reply, a recorded reply, and a real model call.
+- Added a daily spending cap, checked before every real call.
+- Added one log line per request, with the settings that produced it and no question text.
+- Started this paper and a weekly lab notebook.
+
+**Phase 2, Week 2 · 30 August to 5 September · Done**
+
+- Added the safety check.
+  Every question gets a score, a personal data scan, an intent and a risk level.
+- Attacks are refused with a clear error.
+  Personal data is flagged, not blocked.
+- The real attack model is wired in and switchable.
+  The test suite uses a keyword stand-in, so it never downloads a model.
+
+**Phase 2, Week 3 · 6 to 12 September · Done**
+
+- Added the baseline cache: exact match first, then similarity search.
+- Every stored answer carries its full safety result, ready for the Phase 3 defence.
+- A cache hit is served without the filter, and the log records it.
+- Added a way to reset the cache between experiment runs.
+- 36 tests pass.
+
+---
+
+## 12. Still left
+
+**Phase 2 · by 26 September**
+
+- **Week 4, the main result of this phase.** Generate rewordings from public attack datasets, poison the cache, fire them at our own gateway, sweep the threshold, and read the bypass rate from the log.
+- **A first real model reply through the gateway.** Two attempts on 9 September failed at the model provider.
+  The gateway handled the failure correctly and logged it.
+  A successful call is still to come.
+- **Switch the gateway to the real components.** The real attack model, the full personal data scanner, and Qdrant and Redis, then measure their speed.
+- **Week 5.** Complete the cost numbers in the log, generate the charts from it, redraw the architecture diagram, and record a backup demo.
+
+**Phase 3 · 27 September to 24 October**
+
+- Turn on the verdict check in the cache, and rerun the same attacks.
+- Re-check high-risk cache hits before serving them.
+- Draw the trade-off between safety and cache savings.
+- Add the model picker, the output check and per-user spending limits.
+
+**Phase 4 · 25 October to 14 November**
+
+- Load testing, the full results table and the ablation study.
+- Finish this paper: related work, results, conclusion.
+- A final check that a fresh copy of the project rebuilds every number and chart with one command.

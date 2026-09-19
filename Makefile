@@ -7,7 +7,7 @@ BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test cache-reset live-smoke
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test paper-pdf cache-reset live-smoke
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -79,6 +79,9 @@ gateway-test:   ## Run the test suite inside the image
 cache-reset:    ## Clean the cache between experiments (never by hand)
 	@curl -fsS -X POST $(GATEWAY)/v1/cache/clear | python3 -m json.tool
 
+
+paper-pdf:      ## Build paper/SentryGate-paper.pdf from paper/paper.md (needs Chrome + pip install markdown)
+	python3 paper/build_pdf.py
 
 MMD = problem flow architecture
 
