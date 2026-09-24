@@ -1,7 +1,7 @@
 # Related work
 
-The reading list.
-Nothing gets cited in `paper.md` until it has been read and has a verified citation here.
+Section 10 of the paper is now written, with a References list.
+The sources below are read and cited there; this file stays as the working notes.
 
 **Status key:** `to read`, `read`, `cited`.
 
@@ -9,19 +9,19 @@ Nothing gets cited in `paper.md` until it has been read and has a verified citat
 
 | Source | Why it matters | Status |
 |---|---|---|
-| GPTCache, the open source semantic cache | The reference implementation of the thing we are attacking. Check what its default similarity threshold is and whether it screens at all. | to read |
-| Qdrant documentation on filtered search | Payload filtering is the mechanism our defence uses. Need to confirm the filter is applied during search, not after, or the performance claim changes. | to read |
+| GPTCache, the open source semantic cache | The reference implementation of the thing we are attacking. Check what its default similarity threshold is and whether it screens at all. | cited |
+| Qdrant documentation on filtered search | Payload filtering is the mechanism our defence uses. Need to confirm the filter is applied during search, not after, or the performance claim changes. | cited |
 | Vendor write-ups on LLM caching in production | Evidence that cache-before-filter is what real systems do, not a straw man. This is the weakest link in our argument and needs the best sources. | to read |
 
 ## Prompt injection
 
 | Source | Why it matters | Status |
 |---|---|---|
-| Perez and Ribeiro, "Ignore Previous Prompt" | The origin of the attack phrasing our seed uses. | to read |
-| Greshake et al., on indirect prompt injection | Establishes that injection is a real deployed risk, not a lab curiosity. | to read |
+| Perez and Ribeiro, "Ignore Previous Prompt" | The origin of the attack phrasing our seed uses. | cited |
+| Greshake et al., on indirect prompt injection | Establishes that injection is a real deployed risk, not a lab curiosity. | cited |
 | OWASP Top 10 for LLM Applications | Where our mitigation modules are mapped. Already used to answer the broader-coverage feedback in the Phase 1 deck. | read |
-| `protectai/deberta-v3-base-prompt-injection-v2` model card | The filter we actually run. Need its reported detection and false positive rates to compare against ours. | to read |
-| `deepset/prompt-injections`, `jayavibhav/prompt-injection` | Our attack seeds in Week 4. Need licence and composition. | to read |
+| `protectai/deberta-v3-base-prompt-injection-v2` model card | The filter we actually run. Need its reported detection and false positive rates to compare against ours. | cited |
+| `deepset/prompt-injections`, `jayavibhav/prompt-injection` | Our attack seeds in Week 4. Need licence and composition. | cited |
 | garak | Probe suite. Possible source of extra attack families. | to read |
 
 ## LLM serving infrastructure security
@@ -29,7 +29,7 @@ Nothing gets cited in `paper.md` until it has been read and has a verified citat
 | Source | Why it matters | Status |
 |---|---|---|
 | Work on cache side channels in general systems | Our flaw is a cache side channel with a new payload. Older literature will have named this pattern already, and we should use their name. | to read |
-| Microsoft Presidio | The personal data detector in our screening layer. | to read |
+| Microsoft Presidio | The personal data detector in our screening layer. | cited |
 
 ## The gap we claim
 

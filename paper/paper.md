@@ -435,13 +435,66 @@ We write these down as we find them.
 
 ## 10. Related work
 
-Three areas meet in this work: semantic caching for LLMs, prompt injection attacks and defences, and the security of the systems that serve models.
-Each is studied on its own.
-Our claim is that the point where caching and filtering meet in one request path is not.
+Three areas meet in this work: semantic caching for LLMs, prompt-injection attacks and their defences, and the point where the two are put in one request path.
+Each of the first two is well studied.
+The third, which is where our contribution sits, is described informally but has not been measured on a running system or closed by design.
 
-> **Pending · Phase 4**
-> The written review.
-> Our reading list is in the project repository, and nothing is cited here until it has been read.
+### 10.1 Semantic caching for LLMs
+
+A semantic cache stores past answers and returns one when a new prompt is close enough in meaning to an old one.
+GPTCache is the open-source reference implementation and the design most production systems follow (Bang, 2023).
+More recent systems refine the same idea for cost and latency, for example GPT Semantic Cache (Regmi and Pun, 2024).
+Every one of these systems matches on meaning alone.
+None makes the safety of the earlier prompt part of the match condition, which is exactly the gap our defence fills.
+
+### 10.2 Prompt injection: attacks and defences
+
+Prompt injection was named and demonstrated by Perez and Ribeiro (2022), who showed that simple handcrafted inputs can hijack a model's goal or leak its prompt.
+Greshake et al. (2023) extended it to indirect injection, where the malicious instruction is not typed by the user but embedded in content the model later reads, and showed real applications being compromised.
+Liu et al. (2024) put attacks and defences on a common benchmark.
+Detection filters, like the classifier we run, are a standard defence, and their evasion is itself an active area: recent work bypasses guardrails with character-level and adversarial tricks (Jain et al., 2025).
+Our position is consistent with all of this.
+The filter is good and worth having.
+Our result is not that the filter is weak, but that a cache in front of it can make it irrelevant.
+
+### 10.3 Where caching and filtering meet
+
+The specific failure we study, a semantic cache serving a poisoned answer to a reworded attack, is recognised informally.
+Industry write-ups describe cache poisoning of the LLM fast path, and the OWASP Top 10 for LLM Applications (2025) lists prompt injection first and calls out vector and embedding weaknesses as a separate risk category.
+What we have not found is a measurement of the bypass on a running gateway, with the claim that the filter never ran read from the system's own logs, or a defence that removes it by making the cache itself safety-aware rather than by screening every request.
+That measurement (section 8) and that defence (section 5) are our contribution.
+
+### 10.4 Components we build on
+
+The attack detector is ProtectAI's DeBERTa-v3 prompt-injection classifier.
+Personal-data detection uses Microsoft Presidio.
+Embeddings use Sentence-Transformers' all-MiniLM-L6-v2, and the vector store is Qdrant, whose payload filtering is the mechanism the Phase 3 defence will use.
+Attack seeds come from the public deepset/prompt-injections and jayavibhav/prompt-injection datasets.
+
+---
+
+## References
+
+Bang, F. (2023). GPTCache: An Open-Source Semantic Cache for LLM Applications Enabling Faster Answers and Cost Savings. In Proceedings of the 3rd Workshop for Natural Language Processing Open Source Software (NLP-OSS), pp. 212–218. ACL. https://aclanthology.org/2023.nlposs-1.24/
+
+Greshake, K., Abdelnabi, S., Mishra, S., Endres, C., Holz, T., and Fritz, M. (2023). Not What You've Signed Up For: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection. In Proceedings of the 16th ACM Workshop on Artificial Intelligence and Security (AISec). https://doi.org/10.1145/3605764.3623985
+
+Jain, N., et al. (2025). Bypassing Prompt Injection and Jailbreak Detection in LLM Guardrails. arXiv:2504.11168.
+
+Liu, Y., Jia, Y., Geng, R., Jia, J., and Gong, N. Z. (2024). Formalizing and Benchmarking Prompt Injection Attacks and Defenses. In USENIX Security Symposium. arXiv:2310.12815.
+
+OWASP (2025). OWASP Top 10 for Large Language Model Applications. https://genai.owasp.org/
+
+Perez, F., and Ribeiro, I. (2022). Ignore Previous Prompt: Attack Techniques For Language Models. ML Safety Workshop, NeurIPS 2022. arXiv:2211.09527.
+
+Regmi, S., and Pun, C. P. (2024). GPT Semantic Cache: Reducing LLM Costs and Latency via Semantic Embedding Caching. arXiv:2411.05276.
+
+**Tools and datasets.**
+ProtectAI, deberta-v3-base-prompt-injection-v2 (Hugging Face model).
+Microsoft Presidio, personal-data detection (github.com/microsoft/presidio).
+Sentence-Transformers, all-MiniLM-L6-v2 (Reimers and Gurevych, 2019).
+Qdrant vector database (qdrant.tech).
+deepset/prompt-injections and jayavibhav/prompt-injection (Hugging Face datasets).
 
 ---
 
