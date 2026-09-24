@@ -7,7 +7,7 @@ BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test gateway-demo paper-pdf variants bypass figures eval deck-phase2 cache-reset live-smoke
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx cache-reset live-smoke
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -115,6 +115,10 @@ deck:           ## Rebuild docs/deck.html from the template + the captured run
 
 deck-phase2:    ## Rebuild docs/deck-phase2.html from the Week 4/5 results
 	python3 docs/build_deck_phase2.py
+
+deck-phase2-pptx: ## Rebuild the editable PowerPoint (docs/deck-phase2.pptx)
+	@node -e "require('pptxgenjs')" 2>/dev/null || npm install --no-save pptxgenjs
+	node docs/build_deck_phase2_pptx.js
 
 present:        ## Serve the deck at http://127.0.0.1:8777/deck.html
 	@echo "Open http://127.0.0.1:8777/deck.html  (Ctrl-C to stop)"

@@ -20,3 +20,5 @@ data/week4/run-*.jsonl
 data/week4/smoke.jsonl
 data/week5/
 .DS_Store
+node_modules/
+package-lock.json
