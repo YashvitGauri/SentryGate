@@ -309,9 +309,10 @@ A `/metrics/summary` endpoint reads the request log and reports the counts, the 
 None of them download a model or call an API.
 
 The result in section 8 ran on the real components: the real injection filter, the real embedding model, Presidio, and real Qdrant and Redis.
-One thing was mocked on purpose: the model reply.
-The bypass is about answers served from the cache, so the model is never called, which keeps the run free and repeatable.
-A first real model call is the one Phase 2 item still open, and it needs a working provider account.
+The model reply was mocked there on purpose, because the bypass is about answers served from the cache, so the model is never called and the run stays free and repeatable.
+A real model call has since been made end to end through the gateway, using OpenRouter with `openai/gpt-4o-mini`.
+A question went in, the filter passed it, the gateway called the model, the reply came back and was cached, and the real cost was recorded.
+The reply was recorded to disk, so the same call now replays for free with no key. Phase 2 has no open items.
 
 ---
 
@@ -492,6 +493,7 @@ Our claim is that the point where caching and filtering meet in one request path
 - Added a `/metrics/summary` endpoint that reads the log and reports counts, cache hit rate and response times, for the demo screen.
 - Measured response times from 25,416 real requests: a cache hit is about 14 ms, a miss about 94 ms. The seven-times gap is why the cache goes first.
 - Redrew the architecture diagram to match exactly what runs today, including the parts built but not yet wired in.
+- Made a first real model call end to end through the gateway, using OpenRouter with the cheapest OpenAI model. It was recorded, so it replays for free.
 - Recorded the full end-to-end demo as an on-stage fallback.
 - 54 tests pass. Phase 2 is complete.
 
@@ -499,11 +501,7 @@ Our claim is that the point where caching and filtering meet in one request path
 
 ## 12. Still left
 
-**One item carried from Phase 2 into Phase 3**
-
-- **A first real model reply through the gateway.** Two attempts on 9 September failed at the model provider, which is an account problem, not a gateway one.
-  The gateway handled the failure correctly and logged it.
-  Phase 3 Week 1 calls a model on every cache miss, so this is done there, on a working account.
+Phase 2 is complete, with no open items.
 
 **Phase 3 · 27 September to 24 October**
 

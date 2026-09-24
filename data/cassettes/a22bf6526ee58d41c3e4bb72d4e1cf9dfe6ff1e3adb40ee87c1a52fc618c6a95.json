@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "Paris.",
+  "tokens_in": 18,
+  "tokens_out": 2,
+  "recorded_at": "2026-09-24T19:28:05Z"
+}

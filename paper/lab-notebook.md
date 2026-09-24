@@ -230,3 +230,13 @@ A cache hit answers in 14 ms. A miss pays the safety check and takes 94 ms, abou
 ### Next
 
 Phase 3, Week 1. Turn on the verdict check in the cache and rerun the exact Week 4 attacks. The bypass rate should drop sharply. That is the first proof the fix works.
+
+### Postscript: the real model call (25 Sept)
+
+The one open Phase 2 item is now closed. We switched the provider to OpenRouter, which is OpenAI-compatible, so the gateway needed no code change beyond adding the model slugs to the price table. With a valid key:
+
+- A real question went in, the filter passed it as clean, the gateway called `openai/gpt-4o-mini` through OpenRouter, and "Paris." came back. Real cost recorded: about $0.000024.
+- Recording was on, so a cassette was written. In replay mode the same call now returns "Paris." from disk, with no key and no cost.
+- A repeat of the question hit the cache and cost nothing.
+
+The old provider (agentrouter.org) had been rejecting the key with 401, which was an account problem, not a gateway one. OpenRouter fixed it with a base-URL swap.
