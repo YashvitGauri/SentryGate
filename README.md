@@ -234,6 +234,7 @@ make demo-fast   # keyword stand-in, ~5 s
 | `make docker-demo-fast` | Same, keyword stand-in, ~3 s |
 | `make demo` / `make demo-fast` | Same two, on local Python |
 | `make present` | Serve the deck at `127.0.0.1:8777` |
+| `make deck-phase2` | Rebuild the Phase 2 checkpoint deck from the results |
 | `make capture` | Re-record the run the deck quotes |
 | `make deck` | Rebuild `docs/deck.html` |
 | `make diagram` | Redraw both diagrams from mermaid source |
