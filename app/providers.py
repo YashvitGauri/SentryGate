@@ -33,9 +33,15 @@ from app.schemas import ChatCompletionRequest, prompt_hash
 # Check these against the provider price page before any cost number is
 # quoted in the paper. They are here now because the spend cap needs them.
 PRICES: dict[str, tuple[float, float]] = {
+    # OpenAI direct names.
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4o": (2.50, 10.00),
     "gpt-4.1-mini": (0.40, 1.60),
+    # OpenRouter slugs (same underlying models, same list price). OpenRouter is
+    # our provider for the live call; see .env.example.
+    "openai/gpt-4o-mini": (0.15, 0.60),
+    "openai/gpt-4o": (2.50, 10.00),
+    "openai/gpt-4.1-mini": (0.40, 1.60),
 }
 FALLBACK_PRICE = (1.00, 3.00)  # unknown model: assume dear, so the cap stays safe
 

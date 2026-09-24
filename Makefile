@@ -125,7 +125,7 @@ freeze:
 
 live-smoke:     ## One real call through the gateway (needs env key, never stored)
 	@test -n "$$OPENAI_API_KEY" || (echo 'Set OPENAI_API_KEY first. Never commit it.' && exit 1)
-	BUILD_SHA=$(BUILD_SHA) PROVIDER_MODE=live OPENAI_API_KEY="$$OPENAI_API_KEY" OPENAI_BASE_URL="$${OPENAI_BASE_URL:-https://agentrouter.org/v1}" DEFAULT_MODEL="$${LIVE_MODEL:-gpt-5.5}" docker compose up -d --build gateway nginx
+	BUILD_SHA=$(BUILD_SHA) PROVIDER_MODE=live OPENAI_API_KEY="$$OPENAI_API_KEY" OPENAI_BASE_URL="$${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}" DEFAULT_MODEL="$${LIVE_MODEL:-openai/gpt-4o-mini}" docker compose up -d --build gateway nginx
 	@sleep 6
-	@curl -fsS -D /tmp/sg-live-headers.txt $(GATEWAY)/v1/chat/completions -H 'content-type: application/json' -d '{"model":"'"$${LIVE_MODEL:-gpt-5.5}"'","messages":[{"role":"user","content":"Reply with OK only"}],"max_tokens":5}' | python3 -m json.tool
+	@curl -fsS -D /tmp/sg-live-headers.txt $(GATEWAY)/v1/chat/completions -H 'content-type: application/json' -d '{"model":"'"$${LIVE_MODEL:-openai/gpt-4o-mini}"'","messages":[{"role":"user","content":"Reply with OK only"}],"max_tokens":5}' | python3 -m json.tool
 	@grep -i x-sentrygate /tmp/sg-live-headers.txt
