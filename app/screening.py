@@ -57,30 +57,67 @@ class HuggingFaceScorer:
         return float(out["score"]) if out["label"] == "INJECTION" else 1.0 - float(out["score"])
 
 
+SPACY_MODEL = "en_core_web_sm"
+
+# Presidio loads a spaCy model, which is slow. Build the analyzer once and
+# reuse it. The old code rebuilt it on every request, which reloaded the model
+# every time; on a real workload that alone would dominate the latency.
+_PRESIDIO_ENGINE = None
+_PRESIDIO_TRIED = False
+
+
+def _get_presidio():
+    """Return a ready AnalyzerEngine, or None if Presidio is not installed.
+
+    Built once and cached. A None result means fall back to the regex scan, so
+    the gateway and the tests still run with no spaCy model present.
+    """
+    global _PRESIDIO_ENGINE, _PRESIDIO_TRIED
+    if _PRESIDIO_TRIED:
+        return _PRESIDIO_ENGINE
+    _PRESIDIO_TRIED = True
+    try:
+        from presidio_analyzer import AnalyzerEngine  # type: ignore
+        from presidio_analyzer.nlp_engine import NlpEngineProvider  # type: ignore
+
+        provider = NlpEngineProvider(nlp_configuration={
+            "nlp_engine_name": "spacy",
+            "models": [{"lang_code": "en", "model_name": SPACY_MODEL}],
+        })
+        _PRESIDIO_ENGINE = AnalyzerEngine(nlp_engine=provider.create_engine())
+    except Exception:
+        _PRESIDIO_ENGINE = None
+    return _PRESIDIO_ENGINE
+
+
+def _regex_pii(prompt: str) -> tuple[bool, tuple[str, ...], str]:
+    found: list[str] = []
+    if _EMAIL_RE.search(prompt):
+        found.append("EMAIL_ADDRESS")
+    # Avoid flagging every short number: require at least 9 digits.
+    for match in _PHONE_RE.findall(prompt):
+        digits = re.sub(r"\D", "", match)
+        if len(digits) >= 9:
+            found.append("PHONE_NUMBER")
+            break
+    return (len(found) > 0, tuple(found), "regex-fallback-v0")
+
+
 def analyze_pii(prompt: str) -> tuple[bool, tuple[str, ...], str]:
     """Return (has_pii, entity_types, analyzer_version).
 
-    Tries Presidio first. Falls back to email/phone regex so the gateway and
-    the tests run without spaCy weights installed.
+    Uses Presidio when it is installed, and the email/phone regex otherwise, so
+    the gateway and the tests run with or without the spaCy model.
     """
+    engine = _get_presidio()
+    if engine is None:
+        return _regex_pii(prompt)
     try:
-        from presidio_analyzer import AnalyzerEngine  # type: ignore
-
-        engine = AnalyzerEngine()
         results = engine.analyze(text=prompt, language="en")
         entities = tuple(sorted({r.entity_type for r in results}))
-        return (len(entities) > 0, entities, "presidio")
+        return (len(entities) > 0, entities, f"presidio+{SPACY_MODEL}")
     except Exception:
-        found: list[str] = []
-        if _EMAIL_RE.search(prompt):
-            found.append("EMAIL_ADDRESS")
-        # Avoid flagging every short number: require at least 9 digits.
-        for match in _PHONE_RE.findall(prompt):
-            digits = re.sub(r"\D", "", match)
-            if len(digits) >= 9:
-                found.append("PHONE_NUMBER")
-                break
-        return (len(found) > 0, tuple(found), "regex-fallback-v0")
+        return _regex_pii(prompt)
 
 
 class Screener:

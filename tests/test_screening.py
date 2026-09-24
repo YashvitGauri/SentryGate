@@ -12,7 +12,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.screening import KeywordStubScorer, Screener, analyze_pii, build_screener
+from app.screening import (
+    KeywordStubScorer,
+    Screener,
+    _get_presidio,
+    _regex_pii,
+    analyze_pii,
+    build_screener,
+)
 from app.verdict import assess_risk, classify_intent, make_verdict
 
 
@@ -22,15 +29,28 @@ def test_stub_catches_the_demo_attack_and_passes_benign():
     assert scorer.score("what is the capital of France?") == 0.0
 
 
-def test_pii_fallback_flags_email_and_phone_without_presidio():
-    has_pii, entities, _ = analyze_pii("contact me at ana@example.com please")
+def test_regex_fallback_flags_email_and_phone_only():
+    """The fallback used when Presidio is not installed. Tested directly so it
+    is checked no matter what is present in the image."""
+    has_pii, entities, version = _regex_pii("contact me at ana@example.com please")
+    assert has_pii is True and "EMAIL_ADDRESS" in entities
+    assert version == "regex-fallback-v0"
+    has_pii, entities, _ = _regex_pii("call me on +1 555 123 4567 tomorrow")
+    assert has_pii is True and "PHONE_NUMBER" in entities
+    # The regex is narrow on purpose: a plain place name is not personal data.
+    has_pii, _, _ = _regex_pii("what is the capital of France?")
+    assert has_pii is False
+
+
+def test_presidio_flags_an_email_when_installed():
+    """When Presidio is present it does the scanning. It sees more than the
+    regex (names, places), so we only assert on the clear case: an email."""
+    if _get_presidio() is None:
+        pytest.skip("Presidio not installed in this image")
+    has_pii, entities, version = analyze_pii("my email is ana@example.com")
     assert has_pii is True
     assert "EMAIL_ADDRESS" in entities
-    has_pii, entities, _ = analyze_pii("call me on +1 555 123 4567 tomorrow")
-    assert has_pii is True
-    assert "PHONE_NUMBER" in entities
-    has_pii, _, _ = analyze_pii("what is the capital of France?")
-    assert has_pii is False
+    assert version.startswith("presidio")
 
 
 def test_intent_buckets():

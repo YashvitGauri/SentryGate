@@ -160,6 +160,8 @@ What exists today, and what does not:
 | Safety check | done (Week 2) |
 | Cache | done (Week 3 baseline, deliberately vulnerable) |
 | Bypass reproduced on the real gateway | done (Week 4) |
+| Full Presidio personal-data scan | done (Week 5) |
+| Live tally endpoint, latency figures | done (Week 5) |
 
 The response headers say so on every request. On a miss:
 
@@ -202,7 +204,7 @@ make figures     # rebuild the table and chart from the results
 Result table: [`data/week4/table.md`](data/week4/table.md).
 Chart: [`paper/figures/bypass_vs_threshold.png`](paper/figures/bypass_vs_threshold.png).
 
-Recorded output: [`docs/captures/gateway-week1.txt`](docs/captures/gateway-week1.txt).
+Recorded end-to-end demo: [`docs/captures/gateway-week5.txt`](docs/captures/gateway-week5.txt) (`make gateway-demo`). Week 1 capture: [`docs/captures/gateway-week1.txt`](docs/captures/gateway-week1.txt).
 
 Full plan for the phase: [`specs/002-phase2-gateway.md`](specs/002-phase2-gateway.md).
 The paper is written alongside it in [`paper/`](paper/).
@@ -249,7 +251,7 @@ make demo-fast   # keyword stand-in, ~5 s
 | Phase | Window | Goal | State |
 |---|---|---|---|
 | **1** | 18–22 Aug | Prove the problem is real | **done** |
-| **2** | 23 Aug - 26 Sep | Build the gateway; reproduce the problem on our own running system | **weeks 1-4 done, week 5 next** |
+| **2** | 23 Aug - 26 Sep | Build the gateway; reproduce the problem on our own running system | **done** |
 | **3** | 27 Sep – 24 Oct | Build the fix; show it beat the old version live | not started |
 | **4** | 25 Oct – 14 Nov | Measure everything properly; write the paper | not started |
 

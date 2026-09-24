@@ -7,7 +7,7 @@ BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test paper-pdf variants bypass figures cache-reset live-smoke
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test gateway-demo paper-pdf variants bypass figures eval cache-reset live-smoke
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -73,6 +73,9 @@ gateway-smoke:  ## Prove it works: health, a real request, and the log line
 	@echo "\n--- the log line ---"
 	@tail -1 data/requests.jsonl | python3 -m json.tool
 
+gateway-demo:   ## Record the full end-to-end demo to docs/captures/ (gateway must be up with ALLOW_CACHE_SEED=on)
+	docker run --rm --network container:sentrygate-gateway -v $(CURDIR):/src -w /src sentrygate-attacks python attacks/demo.py | tee docs/captures/gateway-week5.txt
+
 gateway-test:   ## Run the test suite inside the image
 	docker run --rm -v $(CURDIR):/src -w /src sentrygate-gateway python -m pytest -q
 
@@ -95,10 +98,14 @@ bypass: attacks-build   ## Run the full sweep on the real gateway (the Phase 2 r
 	bash attacks/sweep.sh
 
 figures: attacks-build  ## Rebuild the table and chart from the results
-	docker run --rm -v $(CURDIR):/src -w /src sentrygate-attacks python eval/make_figures.py
+	docker run --rm -v $(CURDIR):/src -w /src sentrygate-attacks python -m eval.make_figures
+
+eval: attacks-build     ## Regenerate every figure from the logs (bypass + latency)
+	docker run --rm -v $(CURDIR):/src -w /src sentrygate-attacks python -m eval.make_figures
+	docker run --rm -v $(CURDIR):/src -w /src sentrygate-attacks python -m eval.latency_report
 
 
-MMD = problem flow architecture
+MMD = problem flow architecture architecture-current
 
 diagram:        ## every mermaid source -> png, light for print + dark for the deck
 	@for d in $(MMD); do 	  npx -y @mermaid-js/mermaid-cli -i docs/$$d.mmd -o docs/$$d.png -b white -w 1800; 	  npx -y @mermaid-js/mermaid-cli -i docs/$$d.mmd -o docs/captures/$$d-dark.png -t dark -b transparent -w 2000 -s 2; 	done

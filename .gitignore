@@ -18,3 +18,5 @@ data/spend_ledger.json
 data/week4/raw/
 data/week4/run-*.jsonl
 data/week4/smoke.jsonl
+data/week5/
+.DS_Store

@@ -7,6 +7,9 @@ pydantic==2.10.4
 sentence-transformers==3.3.1
 qdrant-client==1.13.0
 redis==5.2.1
+# Week 5: full personal-data scanner. spaCy model is downloaded in the Dockerfile.
+presidio-analyzer==2.2.355
+spacy==3.8.7
 
 # Tests only.
 pytest==8.3.4

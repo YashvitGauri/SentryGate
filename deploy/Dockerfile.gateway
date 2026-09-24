@@ -28,7 +28,8 @@ COPY requirements-gateway.txt .
 RUN pip install --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cpu \
         torch==2.5.1 \
- && pip install --no-cache-dir -r requirements-gateway.txt
+ && pip install --no-cache-dir -r requirements-gateway.txt \
+ && python -m spacy download en_core_web_sm
 
 COPY app/ app/
 

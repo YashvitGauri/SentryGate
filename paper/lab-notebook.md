@@ -197,3 +197,36 @@ At 0.85, a setting a real product would use, 97% of lazy rewordings were served 
 ### Next week
 
 Week 5. A first real model call, the full personal data scanner, cost and speed numbers, and the backup demo.
+
+---
+
+## Phase 2, Week 5 (20 to 26 September): finish the gateway
+
+**Goal for the week.** Close Phase 2: real personal-data scanner, a live tally, speed numbers, the diagram, and a recorded demo.
+
+### What we built
+
+- **Presidio.** The full personal-data scanner replaces the email/phone regex. It now finds names and places too. It also loads once instead of on every request, which the old code got wrong: it rebuilt the engine per call, reloading the spaCy model every time. On real traffic that alone would have dominated the latency.
+- **`/metrics/summary`.** Reads the request log and reports counts, cache hit rate, blocked attacks, and response times. This is what the demo shows on screen.
+- **Latency report (`eval/latency_report.py`, `make eval`).** Reads the request logs and reports p50/p99 for hits, misses and blocks. From 25,416 real requests: hit 14 ms, miss 94 ms, blocked 84 ms.
+- **`docs/architecture-current.mmd`.** A diagram of what actually runs today, with the cache checked before the filter and the not-yet-wired parts greyed out.
+- **`attacks/demo.py`, `make gateway-demo`.** A short end-to-end walk-through, recorded to `docs/captures/gateway-week5.txt` as the on-stage fallback.
+
+### The number that matters
+
+A cache hit answers in 14 ms. A miss pays the safety check and takes 94 ms, about seven times slower. That gap is the whole reason the cache goes first, and so the whole reason the bypass exists. It also says why the fix cannot be "just screen everything": that throws the speed-up away.
+
+### What went wrong
+
+- **Redis would not resolve from the gateway** after a plain `docker compose up gateway`: the Redis container was not running, so the gateway fell back to an in-memory store. Started Redis explicitly and recreated the gateway. `/healthz` names the backend, so this was caught immediately rather than silently running on memory.
+- **`make eval` failed with `No module named app`.** The latency script imports `app.metrics`, but run as a plain script the repo root was not on the path. Fixed by running it as a module (`python -m eval.latency_report`).
+- **One PII test broke once Presidio was installed.** It assumed the regex fallback and expected "France" not to be flagged, but Presidio correctly flags it as a place. Split into two tests: the regex fallback tested directly, and Presidio tested for the clear email case.
+
+### Honest state
+
+- Phase 2 is complete. 54 tests pass.
+- One item is carried into Phase 3: a first real model reply. The two tries on 9 September failed at the provider, which is an account problem. Phase 3 Week 1 calls a model on every cache miss, so it lands there on a working account. Nothing in Phase 2 needed it, because the bypass is about answers served from the cache.
+
+### Next
+
+Phase 3, Week 1. Turn on the verdict check in the cache and rerun the exact Week 4 attacks. The bypass rate should drop sharply. That is the first proof the fix works.

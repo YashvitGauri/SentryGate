@@ -1,0 +1,66 @@
+%% SentryGate - what actually runs at the end of Phase 2 (Week 5).
+%% This is the honest picture: the cache is checked BEFORE the safety check,
+%% which is the hole Week 4 measured. The safety label is stored next to every
+%% cached answer but not yet used to decide a match - that is the Phase 3 fix.
+%% Amber = our contribution. Dashed grey = built for later, not wired in yet.
+%% Render: make diagram
+flowchart LR
+
+    subgraph CL[" CLIENTS "]
+        direction TB
+        APP["Any app that speaks<br/>the OpenAI API"]
+        ATK["Attack suite<br/><i>239 seeds, rewordings</i>"]
+    end
+
+    NG["<b>Nginx</b><br/>routing"]
+
+    subgraph GW[" THE GATEWAY &nbsp;&mdash;&nbsp; FastAPI "]
+        direction TB
+        CACHE["<b>Cache lookup</b><br/><i>checked first</i>"]
+        SCR["<b>Safety check</b><br/>deberta attack detector<br/>Presidio personal-data scan<br/><b>&rarr; SAFETY LABEL</b>"]
+        PROV["<b>Model call</b><br/>mock / replay / live<br/>+ daily spend cap"]
+        STORE["<b>Store answer</b><br/><b>+ safety label</b>"]
+        LOG["<b>Recorder</b><br/>cost, speed, outcome<br/>/metrics/summary"]
+
+        CACHE -->|hit: served, NOT screened| LOG
+        CACHE -->|miss| SCR
+        SCR -->|clean| PROV --> STORE --> LOG
+    end
+
+    subgraph ST[" STORAGE "]
+        direction TB
+        QD[("<b>Qdrant</b><br/>question meanings<br/><b>+ safety labels stored</b>")]
+        RD[("Redis<br/>exact repeats")]
+        JL[("Request log<br/>one line per request")]
+    end
+
+    PRV["Model provider<br/><i>OpenAI-compatible</i>"]
+
+    subgraph LATER[" BUILT FOR LATER, NOT WIRED IN YET "]
+        direction TB
+        FILT["Verdict-filtered lookup<br/><i>Phase 3: the fix</i>"]
+        REV["Re-check risky hits"]
+        RTR["Model picker + failover"]
+        OG["Answer check"]
+        RL["Per-key spend limit"]
+    end
+
+    APP --> NG
+    ATK --> NG
+    NG --> CACHE
+
+    SCR -.->|attack| BLK["Refused 403<br/>+ reason"]
+    CACHE <--> QD
+    CACHE <--> RD
+    STORE --> QD
+    PROV --> PRV
+    LOG --> JL
+
+    classDef ours fill:#fde68a,stroke:#b45309,stroke-width:3px,color:#000
+    classDef store fill:#dbeafe,stroke:#1d4ed8,color:#000
+    classDef stop fill:#fecaca,stroke:#b91c1c,color:#000
+    classDef later fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray:5 4,color:#6b7280
+    class CACHE,STORE,QD ours
+    class RD,JL store
+    class BLK stop
+    class FILT,REV,RTR,OG,RL later

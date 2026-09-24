@@ -113,6 +113,17 @@ def healthz() -> dict:
     }
 
 
+@app.get("/metrics/summary")
+def metrics_summary() -> dict:
+    """The real traffic so far, read from the request log. For the live demo."""
+    from app.metrics import summarise_file
+
+    settings: Settings = app.state.settings
+    summary = summarise_file(settings.log_path)
+    summary["config"] = getattr(app.state, "log_config", None) or settings.as_log_dict()
+    return summary
+
+
 @app.post("/v1/cache/clear")
 def cache_clear() -> dict:
     """Reset between experiments. Doing it by hand corrupts results."""

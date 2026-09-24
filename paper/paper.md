@@ -4,7 +4,7 @@ Closing a safety bypass in LLM gateways.
 
 **Divyansh Sharma · Sarvagya Dabas · Yashvit Gauri**
 
-Progress draft · Phase 2 · 19 September 2026
+Progress draft · Phase 2 complete · 26 September 2026
 
 This draft is written alongside the code.
 Every claim in it is backed by something already built and committed.
@@ -93,8 +93,7 @@ If the filter ran first, every request would pay for it, including the ones the 
 So real systems check the cache first.
 That is a sensible engineering choice, and it is the hole.
 
-> **Pending · Week 5**
-> Both timings measured on our own gateway, so this argument rests on our numbers.
+Section 8.3 measures both timings on our own gateway: a cache hit is about 14 milliseconds, a miss about 94.
 
 ---
 
@@ -248,15 +247,18 @@ The gateway is a web service that speaks the same API as OpenAI.
 Any app that already talks to OpenAI can use it by changing one address.
 It runs in Docker, behind nginx, on any machine.
 
+![What runs today. The cache is checked before the safety check, which is the hole. Every stored answer carries a safety label, but the lookup does not yet use it. The greyed parts are built for later.](../docs/architecture-current.png)
+
 | Part | State |
 |---|---|
 | OpenAI-compatible API, nginx in front | **Done** · Week 1 |
 | Settings, including the experiment switches | **Done** · Week 1 |
 | Model calls, with record and replay | **Done** · Week 1 |
 | One log line per request | **Done** · Week 1 |
-| Safety check: attack score and personal data scan | **Done** · Week 2 |
+| Safety check: real attack detector and Presidio personal-data scan | **Done** · Weeks 2, 5 |
 | Baseline cache: exact match plus similarity search | **Done** · Week 3 |
 | Attack generator and threshold sweep | **Done** · Week 4 |
+| Live tally endpoint and latency figures | **Done** · Week 5 |
 | Verdict-checked cache lookup, the defence | Phase 3 |
 | Model picker, output check, spend limits | Phase 3 |
 
@@ -287,6 +289,8 @@ A daily spending cap is checked before every real model call.
 
 **Safety check.**
 Every question gets a safety result before anything else happens, unless the cache answers it first.
+The attack detector is the real injection model.
+The personal data scan is Presidio, which finds names, emails, phone numbers and places.
 Attacks are refused with a clear error.
 Personal data is flagged but not blocked, because blocking every email address would refuse too many honest questions.
 
@@ -295,19 +299,19 @@ Two layers: an exact match first, then a similarity search.
 Every stored answer carries its full safety result.
 The lookup ignores it on purpose, because this is the vulnerable baseline.
 In cache-first mode, a hit returns with the log saying the filter did not run.
-That log line is the evidence Week 4 needs.
+That log line is the evidence in section 8.
+
+**Live tally.**
+A `/metrics/summary` endpoint reads the request log and reports the counts, the cache hit rate, and the response times, for the demo screen.
 
 **Tests.**
-48 automated tests pass in the gateway's Docker image.
+54 automated tests pass in the gateway's Docker image.
 None of them download a model or call an API.
 
-The Week 4 result in section 8 ran on the real components: the real injection filter, the real embedding model, and real Qdrant and Redis.
-Two stand-ins remain, and neither touches that result.
-The personal data scanner still uses a simple text check, because the attack we measure is injection, not personal data.
-The model reply was the fixed test reply, because the bypass is about answers served from the cache, so no model is ever called.
-
-> **Pending · Week 5**
-> A first real model reply through the gateway, and the full personal data scanner, both measured.
+The result in section 8 ran on the real components: the real injection filter, the real embedding model, Presidio, and real Qdrant and Redis.
+One thing was mocked on purpose: the model reply.
+The bypass is about answers served from the cache, so the model is never called, which keeps the run free and repeatable.
+A first real model call is the one Phase 2 item still open, and it needs a working provider account.
 
 ---
 
@@ -379,6 +383,25 @@ Running the exact same build with the filter moved in front of the cache drops t
 Nothing else changed.
 So the bypass is caused by the order, and the fix is to change the order's blind spot, which is what Phase 3 does.
 
+### 8.3 Why the cache is checked first, measured
+
+We claimed in section 2 that the cache goes first because it is much faster than the safety check.
+Here is that gap on our own gateway, from 25,416 real requests in the logs.
+
+| Outcome | Requests | p50 | p99 |
+|---|---|---|---|
+| Cache hit | 20,076 | 14 ms | 108 ms |
+| Miss (safety check, then answer) | 1,830 | 94 ms | 265 ms |
+| Blocked attack | 3,510 | 84 ms | 236 ms |
+
+![Response time by outcome. A cache hit is about seven times faster than a miss, because a miss pays for the safety check.](figures/latency.png)
+
+A cache hit answers in about 14 milliseconds.
+A miss pays the safety check on top, at about 94 milliseconds, roughly seven times slower.
+That gap is the whole reason real systems check the cache first, and so it is the whole reason the bypass exists.
+The fix cannot be to screen every request, because that throws the speed-up away.
+It has to make the cache itself safety-aware, which is Phase 3.
+
 > **Pending · Phase 3**
 > Vulnerable against defended, same attacks, side by side.
 
@@ -415,7 +438,7 @@ Three areas meet in this work: semantic caching for LLMs, prompt injection attac
 Each is studied on its own.
 Our claim is that the point where caching and filtering meet in one request path is not.
 
-> **Pending · Week 5**
+> **Pending · Phase 4**
 > The written review.
 > Our reading list is in the project repository, and nothing is cited here until it has been read.
 
@@ -463,18 +486,24 @@ Our claim is that the point where caching and filtering meet in one request path
 - Proved the order is the cause: with the filter moved in front of the cache, the same attacks gave 0% bypass.
 - Every counted bypass is backed by a log line saying the filter never ran. No honest question was ever served the poison.
 
+**Phase 2, Week 5 · 20 to 26 September · Done**
+
+- Added the full Presidio personal-data scanner. It now finds names and places, not just emails and phone numbers, and it loads once instead of on every request.
+- Added a `/metrics/summary` endpoint that reads the log and reports counts, cache hit rate and response times, for the demo screen.
+- Measured response times from 25,416 real requests: a cache hit is about 14 ms, a miss about 94 ms. The seven-times gap is why the cache goes first.
+- Redrew the architecture diagram to match exactly what runs today, including the parts built but not yet wired in.
+- Recorded the full end-to-end demo as an on-stage fallback.
+- 54 tests pass. Phase 2 is complete.
+
 ---
 
 ## 12. Still left
 
-**Phase 2 · Week 5, by 26 September**
+**One item carried from Phase 2 into Phase 3**
 
-- **A first real model reply through the gateway.** Two attempts on 9 September failed at the model provider.
+- **A first real model reply through the gateway.** Two attempts on 9 September failed at the model provider, which is an account problem, not a gateway one.
   The gateway handled the failure correctly and logged it.
-  A successful call is still to come. The Week 4 result did not need one, because the bypass is about answers served from the cache.
-- **The full personal data scanner.** Week 4 used a simple text check for personal data. Presidio is wired in and needs installing and measuring.
-- **Cost and speed numbers.** Complete the cost figures in the log, and measure response times for hits and misses.
-- **Polish.** Redraw the architecture diagram to match what runs, and record a backup demo.
+  Phase 3 Week 1 calls a model on every cache miss, so this is done there, on a working account.
 
 **Phase 3 · 27 September to 24 October**
 
