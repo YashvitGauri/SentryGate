@@ -77,11 +77,12 @@ gateway-smoke:  ## Prove it works: health, a real request, and the log line
 	@echo "\n--- the log line ---"
 	@tail -1 data/requests.jsonl | python3 -m json.tool
 
-demo-up:        ## Start the gateway for the live demo: real models, seeding on, free mock replies
+demo-up:        ## Start the gateway for the live demo: real models, seeding on, free mock replies, offline
+	@rm -f data/demo/requests.jsonl   # fresh log, so the demo's tally counts only this session
 	docker compose --profile phase2 up -d qdrant redis
 	BUILD_SHA=$(BUILD_SHA) PROVIDER_MODE=mock PROVIDER_RECORD=off PIPELINE_ORDER=cache_first \
 	  CACHE_VERDICT_FILTER=off SIM_THRESHOLD=0.85 SCREENING_SCORER=hf CACHE_EMBEDDER=hf \
-	  CACHE_BACKEND=auto ALLOW_CACHE_SEED=on LOG_FILE=demo/requests.jsonl \
+	  CACHE_BACKEND=auto ALLOW_CACHE_SEED=on LOG_FILE=demo/requests.jsonl HF_HUB_OFFLINE=1 \
 	  docker compose up -d --force-recreate gateway nginx
 	@echo "loading models (about a minute)..."
 	@for i in $$(seq 1 60); do curl -sf $(GATEWAY)/healthz >/dev/null 2>&1 && break; sleep 3; done

@@ -49,6 +49,9 @@ services:
       ALLOW_CACHE_SEED: "${ALLOW_CACHE_SEED:-off}"
       # Each experiment run writes its own log file under data/.
       LOG_FILE: "${LOG_FILE:-requests.jsonl}"
+      # 1 = load models only from the local cache, never contact Hugging Face.
+      # make demo-up sets it, so the demo works in a room with no internet.
+      HF_HUB_OFFLINE: "${HF_HUB_OFFLINE:-0}"
       QDRANT_URL: "${QDRANT_URL:-http://qdrant:6333}"
       REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
     # The request log, the cassettes and the spend ledger live here, so they
