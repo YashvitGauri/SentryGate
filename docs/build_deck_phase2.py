@@ -115,11 +115,46 @@ SLIDES = """
     </section>
 
     <!-- 3 WHAT WE BUILT -->
-    <section class="slide" data-notes="This is what runs today. Point out the honesty: the cache is checked before the filter, which is the hole. The safety label is already stored next to every answer, but the lookup does not use it yet - that is the Phase 3 fix. The greyed boxes are built for later.">
+    <section class="slide" data-notes="Trace the two paths with the cursor. Every question hits the cache first. Seen before: answered at once, and the safety check never runs - that is the hole. New: checked, answered by the model, and saved together with its safety label. Phase 3 makes the cache check that saved label too.">
       <div class="eyebrow">What we built</div>
-      <h2>A real gateway. This is what runs today.</h2>
-      <div class="figframe"><img src="{{ARCH_PNG}}" alt="The gateway as it runs today: nginx in front, a cache checked before the safety check, the safety label stored with every answer but not yet used, Qdrant and Redis, and the Phase 3 parts greyed out."></div>
-      <p><small>OpenAI-compatible API behind nginx, in Docker. The cache is checked <strong>before</strong> the filter &mdash; that is the hole. The safety label is already saved with every answer, ready for the fix.</small></p>
+      <h2>Every question hits the cache first.</h2>
+      <svg class="flow" viewBox="0 0 1144 360" role="img" aria-label="A question goes to the cache first. If the cache has seen something similar, the answer is served at once and the safety check is skipped. If it is new, it is safety-checked, answered by the model, and saved with its safety label.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8496AB"/></marker>
+          <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E5484D"/></marker>
+        </defs>
+        <!-- question -> cache -->
+        <rect x="0" y="140" width="180" height="84" rx="14" fill="#16202C" stroke="#2A3846" stroke-width="2"/>
+        <text x="90" y="179" class="t">A question</text>
+        <text x="90" y="205" class="s">from any app</text>
+        <line x1="180" y1="182" x2="238" y2="182" stroke="#8496AB" stroke-width="2.5" marker-end="url(#ah)"/>
+        <rect x="244" y="140" width="210" height="84" rx="14" fill="#2A2415" stroke="#F2A93B" stroke-width="2.5"/>
+        <text x="349" y="179" class="t">1  Cache</text>
+        <text x="349" y="205" class="s">checked first</text>
+        <!-- top path: seen before -> answered, check skipped -->
+        <path d="M454,170 C510,170 510,62 566,62" fill="none" stroke="#E5484D" stroke-width="2.5" marker-end="url(#ahr)"/>
+        <text x="502" y="120" class="lab red" text-anchor="end">seen before</text>
+        <rect x="572" y="20" width="240" height="84" rx="14" fill="#2A1618" stroke="#E5484D" stroke-width="2.5"/>
+        <text x="692" y="59" class="t">Answer served</text>
+        <text x="692" y="85" class="s">straight from the cache</text>
+        <text x="836" y="54" class="note red">Safety check skipped.</text>
+        <text x="836" y="82" class="note red">This is the hole.</text>
+        <!-- bottom path: new -> check -> model -> save -->
+        <path d="M454,194 C510,194 510,302 566,302" fill="none" stroke="#8496AB" stroke-width="2.5" marker-end="url(#ah)"/>
+        <text x="502" y="258" class="lab" text-anchor="end">new</text>
+        <rect x="572" y="260" width="172" height="84" rx="14" fill="#16202C" stroke="#2A3846" stroke-width="2"/>
+        <text x="658" y="299" class="t">2  Safety check</text>
+        <text x="658" y="325" class="s">blocks attacks</text>
+        <line x1="744" y1="302" x2="772" y2="302" stroke="#8496AB" stroke-width="2.5" marker-end="url(#ah)"/>
+        <rect x="778" y="260" width="146" height="84" rx="14" fill="#16202C" stroke="#2A3846" stroke-width="2"/>
+        <text x="851" y="299" class="t">3  AI model</text>
+        <text x="851" y="325" class="s">writes the answer</text>
+        <line x1="924" y1="302" x2="952" y2="302" stroke="#8496AB" stroke-width="2.5" marker-end="url(#ah)"/>
+        <rect x="958" y="260" width="184" height="84" rx="14" fill="#2A2415" stroke="#F2A93B" stroke-width="2.5"/>
+        <text x="1050" y="299" class="t">4  Save</text>
+        <text x="1050" y="325" class="s">answer + safety label</text>
+      </svg>
+      <p><small>The safety label is already saved with every answer. <strong>The fix in Phase 3: the cache checks that label too</strong>, so a reworded attack no longer matches a safe answer.</small></p>
     </section>
 
     <!-- 4 THE EXPERIMENT -->
@@ -252,7 +287,6 @@ def main() -> int:
     headline = f'{report["by_threshold"]["0.85"]["lazy"]:.0f}'
     slides = SLIDES
     replacements = {
-        "{{ARCH_PNG}}": b64(ROOT / "docs" / "architecture-current.png"),
         "{{BYPASS_PNG}}": b64(ROOT / "paper" / "figures" / "bypass_vs_threshold.png"),
         "{{LATENCY_PNG}}": b64(ROOT / "paper" / "figures" / "latency.png"),
         "{{BYPASS_ROWS}}": bypass_rows(report),
@@ -277,6 +311,14 @@ def main() -> int:
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 {style}
+<style>
+.flow{{width:100%;height:auto;margin:18px 0 6px;font-family:"IBM Plex Sans",system-ui,sans-serif;}}
+.flow .t{{fill:#E9EEF5;font-size:21px;font-weight:600;text-anchor:middle;}}
+.flow .s{{fill:#8496AB;font-size:15px;text-anchor:middle;}}
+.flow .lab{{fill:#8496AB;font-size:15px;font-family:"IBM Plex Mono",monospace;}}
+.flow .note{{font-size:19px;font-weight:600;}}
+.flow .red{{fill:#E5484D;}}
+</style>
 </head>
 <body>
 <div class="viewport">
