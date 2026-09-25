@@ -1,9 +1,9 @@
-# LibreOffice, headless, for turning the generated Word reports into PDF.
+# LibreOffice, headless, for turning the generated Word reports and PowerPoint decks into PDF.
 # fonts-liberation is metric-compatible with Times New Roman and Arial, so the
 # PDF keeps the same line breaks and page breaks as Word.
 FROM debian:bookworm-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libreoffice-writer fonts-liberation fonts-dejavu \
+ && apt-get install -y --no-install-recommends libreoffice-writer libreoffice-impress fonts-liberation fonts-dejavu fonts-roboto \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /work
 ENTRYPOINT ["soffice", "--headless", "--convert-to", "pdf"]

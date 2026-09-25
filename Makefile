@@ -7,7 +7,7 @@ BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx report cache-reset live-smoke
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx report report-pptx cache-reset live-smoke
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -125,6 +125,12 @@ report:         ## Build Progress Report-2 (reports/out/Progress2.docx + .pdf) i
 	@docker image inspect sentrygate-office >/dev/null 2>&1 || docker build -q -f deploy/Dockerfile.office -t sentrygate-office .
 	docker run --rm -v $(CURDIR)/reports/out:/work sentrygate-office Progress2.docx
 	@echo "wrote reports/out/Progress2.pdf"
+
+report-pptx:    ## Build the Progress Report 2 deck (reports/out/SentryGate_Progress_Report_2.pptx + .pdf)
+	@node -e "require('pptxgenjs')" 2>/dev/null || npm install --no-save pptxgenjs
+	node reports/build_progress2_pptx.js
+	@docker image inspect sentrygate-office >/dev/null 2>&1 || docker build -q -f deploy/Dockerfile.office -t sentrygate-office .
+	docker run --rm -v $(CURDIR)/reports/out:/work sentrygate-office SentryGate_Progress_Report_2.pptx
 
 present:        ## Serve the deck at http://127.0.0.1:8777/deck.html
 	@echo "Open http://127.0.0.1:8777/deck.html  (Ctrl-C to stop)"
