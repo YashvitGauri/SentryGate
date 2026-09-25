@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SentryGate Presenting Cheat Sheet</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&family=Roboto+Mono&display=swap">
+<style>
+  @page { size: A4; margin: 13mm 13mm 12mm; }
+  :root { --navy:#1B2433; --gold:#B08A45; --red:#B5452F; --green:#3F7A52; --muted:#4A5260; --line:#E3DED2; --cream:#F9F8F4; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--navy); font-size: 9.2pt; line-height: 1.33; background: #fff; }
+  h1 { font-size: 19pt; font-weight: 500; margin: 0 0 2mm; letter-spacing: -.01em; }
+  h2 { font-size: 10pt; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: .06em; margin: 3.6mm 0 1.4mm; break-after: avoid; }
+  .eyebrow { font-size: 8.5pt; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 1mm; }
+  .one { background: var(--cream); border: 1px solid var(--line); border-radius: 3mm; padding: 3mm 4mm; font-size: 11pt; margin: 2mm 0 1mm; }
+  .one b { color: var(--navy); }
+  table { width: 100%; border-collapse: collapse; margin: 0; }
+  tr { break-inside: avoid; }
+  th { text-align: left; font-size: 8pt; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1.2px solid var(--navy); padding: 1.2mm 2mm; }
+  td { border-bottom: 1px solid var(--line); padding: 1.5mm 2mm; vertical-align: top; }
+  td:first-child { white-space: nowrap; font-weight: 500; }
+  code, .mono { font-family: "Roboto Mono", Menlo, monospace; font-size: 8.6pt; background: var(--cream); border: 1px solid var(--line); border-radius: 1.2mm; padding: .2mm 1.2mm; }
+  .red { color: var(--red); font-weight: 700; } .green { color: var(--green); font-weight: 700; }
+  .say { color: var(--muted); font-style: italic; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .box { border: 1px solid var(--line); border-radius: 3mm; padding: 2.5mm 3.5mm; break-inside: avoid; }
+  .box h3 { margin: 0 0 1mm; font-size: 9.6pt; font-weight: 700; }
+  ol, ul { margin: 0; padding-left: 5mm; } li { margin: .6mm 0; }
+  .pagebreak { break-before: page; }
+  .foot { color: var(--muted); font-size: 8pt; margin-top: 3mm; }
+</style></head>
+<body>
+
+<div class="eyebrow">SentryGate · Progress Report 2 · Presenting cheat sheet</div>
+<h1>How to present to the panel</h1>
+
+<div class="one">If the panel remembers one thing: <b>a cache in front of a safety filter lets attacks through, because on a cache hit the filter is never asked. We proved it on our own system, and we know how to fix it.</b></div>
+
+<h2>Before you start (10 minutes before)</h2>
+<div class="grid">
+  <div class="box">
+    <h3>1. Start the demo (takes about a minute)</h3>
+    Open Docker Desktop first. Then in the project folder:<br>
+    <code>make demo-up</code><br>
+    Wait for the line <b>ready: ... | seeding on</b>. It loads the real models and needs no internet or API key.
+  </div>
+  <div class="box">
+    <h3>2. Open the slides</h3>
+    PowerPoint: <code>SentryGate_Progress_Report_2.pptx</code>, then Slide Show → Presenter View (notes on your screen).<br>
+    Backup: the PDF of the same deck.
+  </div>
+  <div class="box">
+    <h3>3. Keep the backup ready</h3>
+    Open <code>docs/captures/gateway-week5.txt</code> in a tab. If the live demo fails, show this and move on. Never debug on stage.
+  </div>
+  <div class="box">
+    <h3>4. Split the talk</h3>
+    Speaker 1: slides 1–3 · Speaker 2: slides 4–6 · Speaker 3: slide 7 + demo, 8–11. The person who knows the code best does the demo and technical questions.
+  </div>
+</div>
+
+<h2>Useful browser pages (gateway running)</h2>
+<table>
+  <tr><th>Open this</th><th>What it shows</th><th>When to use it</th></tr>
+  <tr><td><code>127.0.0.1:8080/docs</code></td><td>Interactive page: click a route, "Try it out", send a question, see the reply</td><td>If the panel wants to see a request live</td></tr>
+  <tr><td><code>127.0.0.1:8080/metrics/summary</code></td><td>Live tally: requests, cache hit rate, blocked attacks, speed</td><td>Right after the demo</td></tr>
+  <tr><td><code>127.0.0.1:8080/healthz</code></td><td>Which models and stores are loaded</td><td>Check before you start</td></tr>
+  <tr><td><code>127.0.0.1:8080/</code></td><td class="red">Shows "Not Found": there is no home page</td><td>Don't open this one on stage</td></tr>
+</table>
+
+<h2>Talk track (about 10 minutes)</h2>
+<table>
+  <tr><th>Slide</th><th>Say this</th><th>Time</th></tr>
+  <tr><td>1 Cover</td><td class="say">"Phase 1 showed a security problem in a script. Phase 2 built a real system and proved it on it."</td><td>20s</td></tr>
+  <tr><td>2 Summary</td><td class="say">"Apps put a safety filter and a cache in front of the AI. The cache goes first, for speed. On our system <span class="red">97%</span> of reworded attacks got a harmful answer from the cache, and the filter ran <span class="red">zero</span> times. Filter first: <span class="green">0%</span>. The order is the cause."</td><td>1m</td></tr>
+  <tr><td>3 Work</td><td class="say">"Six pieces. Most important is 04: we attacked our own system to measure the hole."</td><td>1m</td></tr>
+  <tr><td>4 Result</td><td class="say">Read the four rows. Slow down on row 3: "same system, filter first, drops to zero. Nothing else changed." And "0 of 700 honest questions affected."</td><td>1m</td></tr>
+  <tr><td>5 Sweep</td><td class="say">"Can't you make the cache stricter? Even the strictest setting leaks 90% of cheap attacks. Tuning can't fix it."</td><td>1m</td></tr>
+  <tr><td>6 Speed</td><td class="say">"Why not check everything? A hit is 14 ms, a full check 94 ms, seven times slower. The fix has to live inside the cache."</td><td>1m</td></tr>
+  <tr><td>7 Diagram</td><td class="say">Trace with the cursor: "match: answered straight away, check skipped, the hole. No match: checked, answered, saved with its safety label." Then run the demo.</td><td>2.5m</td></tr>
+  <tr><td>8 Timeline</td><td class="say">"Phases 1 and 2 complete, on time. Phase 3 builds the fix."</td><td>20s</td></tr>
+  <tr><td>9 Plan</td><td class="say">"The cache already stores a safety label. In Phase 3 it checks the label too. Week 1 reruns these exact attacks with the fix on."</td><td>40s</td></tr>
+  <tr><td>10 Risks</td><td class="say">"Main open item: the fix costs some cache speed, and we'll measure exactly how much."</td><td>30s</td></tr>
+  <tr><td>11 Thanks</td><td class="say">"Thank you. Happy to take questions." Then stop.</td><td>10s</td></tr>
+</table>
+
+
+<h2>The live demo (slide 7)</h2>
+<div class="grid">
+  <div class="box">
+    <h3>Run</h3>
+    <code>make gateway-demo</code><br><br>
+    Narrate as it prints:
+    <ol>
+      <li>Normal question: answered, then served from cache the second time.</li>
+      <li>Attack, empty cache: <span class="green">BLOCKED</span>. The filter works.</li>
+      <li>Same attack after poisoning: <span class="red">served the harmful answer, screened = false</span>. That's the hole, live.</li>
+      <li>Name + email: flagged as personal data.</li>
+    </ol>
+  </div>
+  <div class="box">
+    <h3>If it fails</h3>
+    Say: <i>"Here's the recorded run of the same demo."</i><br>
+    Open <code>docs/captures/gateway-week5.txt</code> and walk through the same four steps.<br><br>
+    <h3>If they want to see a request</h3>
+    Open <code>127.0.0.1:8080/docs</code> → <b>POST /v1/chat/completions</b> → Try it out → Execute.
+  </div>
+</div>
+
+<h2>If they look confused: the analogy</h2>
+<div class="one" style="font-size:10pt">It's like a <b>bouncer</b> (the filter) and a <b>guest list</b> (the cache). If your name is on the list, you walk straight in and the bouncer never checks you. Change your name slightly, and you're still on the list.</div>
+
+<h2>Likely questions</h2>
+<table>
+  <tr><th>They ask</th><th>You answer</th></tr>
+  <tr><td>Isn't the filter just weak?</td><td>No. It catches every attack when asked (score 1.000). It's just never asked on a cache hit.</td></tr>
+  <tr><td>How do you know it didn't run?</td><td>Every request writes a log line. For every bypass, the log says the filter didn't run.</td></tr>
+  <tr><td>Make the cache stricter?</td><td>Slide 5: even the strictest setting leaks 90%.</td></tr>
+  <tr><td>Just check everything?</td><td>Slide 6: seven times slower, and it throws away why the cache exists.</td></tr>
+  <tr><td>How did the bad answer get in?</td><td>We planted it on purpose to model any leak. We measure whether it gets served, not how it got in.</td></tr>
+  <tr><td>Is this a real problem?</td><td>Yes. OWASP's Top 10 for LLM apps flags it. We're the first we know of to measure it on a running system.</td></tr>
+  <tr><td>Real data?</td><td>239 real attacks from two public datasets, reworded 2,838 ways.</td></tr>
+  <tr><td>Don't know the answer?</td><td>"Good question. We haven't measured that yet. It's on our Phase 3 list." Never guess a number.</td></tr>
+</table>
+
+<h2>Five tips</h2>
+<ol>
+  <li><b>Result first, details second.</b> "97% got through", then how.</li>
+  <li><b>Point at the slide.</b> Put the cursor on the exact number or bar you're talking about.</li>
+  <li><b>Don't read every word.</b> One idea per slide.</li>
+  <li><b>Pause after the big numbers.</b> Let "97%" and "zero" land.</li>
+  <li><b>Be honest about limits.</b> "That's Phase 3" sounds confident, not weak.</li>
+</ol>
+
+<h2>The HTML deck (optional)</h2>
+<p style="margin:0">Quickest: double-click <code>docs/deck-phase2.html</code>, or run <code>open docs/deck-phase2.html</code>. Or run <code>make present</code> and open <code>127.0.0.1:8777/deck-phase2.html</code>. Click once inside the page, then press <b>→ / ←</b> to move, <b>F</b> for full screen, <b>N</b> for notes.</p>
+
+<div class="foot">Practise once out loud with a timer, demo included. First runs usually take 15 minutes. Cut words, not slides.</div>
+</body></html>

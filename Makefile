@@ -5,9 +5,13 @@ PY ?= ./.venv/Scripts/python.exe
 # Stamped into the image so the running service reports its own commit.
 BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
+# 6379 is often taken by another local Redis; the gateway reaches Redis
+# over the compose network, so the host port only matters for debugging.
+REDIS_HOST_PORT ?= 6380
+export REDIS_HOST_PORT
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx report report-pptx cache-reset live-smoke
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test demo-up gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx report report-pptx cache-reset live-smoke
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -54,8 +58,8 @@ gateway-up:     ## Start nginx + gateway on http://127.0.0.1:8080
 	BUILD_SHA=$(BUILD_SHA) docker compose up -d --build gateway nginx
 	@echo "gateway is on $(GATEWAY)  (try: make gateway-smoke)"
 
-gateway-down:
-	docker compose down
+gateway-down:   ## Stop everything: nginx, gateway, Qdrant and Redis
+	docker compose --profile phase2 down
 
 gateway-logs:
 	docker compose logs -f gateway
@@ -73,8 +77,19 @@ gateway-smoke:  ## Prove it works: health, a real request, and the log line
 	@echo "\n--- the log line ---"
 	@tail -1 data/requests.jsonl | python3 -m json.tool
 
-gateway-demo:   ## Record the full end-to-end demo to docs/captures/ (gateway must be up with ALLOW_CACHE_SEED=on)
-	docker run --rm --network container:sentrygate-gateway -v $(CURDIR):/src -w /src sentrygate-attacks python attacks/demo.py | tee docs/captures/gateway-week5.txt
+demo-up:        ## Start the gateway for the live demo: real models, seeding on, free mock replies
+	docker compose --profile phase2 up -d qdrant redis
+	BUILD_SHA=$(BUILD_SHA) PROVIDER_MODE=mock PROVIDER_RECORD=off PIPELINE_ORDER=cache_first \
+	  CACHE_VERDICT_FILTER=off SIM_THRESHOLD=0.85 SCREENING_SCORER=hf CACHE_EMBEDDER=hf \
+	  CACHE_BACKEND=auto ALLOW_CACHE_SEED=on LOG_FILE=demo/requests.jsonl \
+	  docker compose up -d --force-recreate gateway nginx
+	@echo "loading models (about a minute)..."
+	@for i in $$(seq 1 60); do curl -sf $(GATEWAY)/healthz >/dev/null 2>&1 && break; sleep 3; done
+	@curl -fsS $(GATEWAY)/healthz | python3 -c "import json,sys; d=json.load(sys.stdin); c=d['config']; print('ready:', c['scorer'].split('/')[-1], '|', c['embedder'], '|', c['cache_backend'], '| seeding', 'on' if d['cache_seed_enabled'] else 'OFF')"
+
+gateway-demo:   ## Run the live end-to-end demo (start it with make demo-up). Output also saved to data/demo/last-demo.txt
+	@mkdir -p data/demo
+	docker run --rm --network container:sentrygate-gateway -v $(CURDIR):/src -w /src sentrygate-attacks python attacks/demo.py | tee data/demo/last-demo.txt
 
 gateway-test:   ## Run the test suite inside the image
 	docker run --rm -v $(CURDIR):/src -w /src sentrygate-gateway python -m pytest -q
@@ -132,9 +147,10 @@ report-pptx:    ## Build the Progress Report 2 deck (reports/out/SentryGate_Prog
 	@docker image inspect sentrygate-office >/dev/null 2>&1 || docker build -q -f deploy/Dockerfile.office -t sentrygate-office .
 	docker run --rm -v $(CURDIR)/reports/out:/work sentrygate-office SentryGate_Progress_Report_2.pptx
 
-present:        ## Serve the deck at http://127.0.0.1:8777/deck.html
-	@echo "Open http://127.0.0.1:8777/deck.html  (Ctrl-C to stop)"
-	cd docs && $(CURDIR)/.venv/Scripts/python.exe -m http.server 8777 --bind 127.0.0.1
+present:        ## Serve the decks at http://127.0.0.1:8777 (Phase 1: deck.html, Phase 2: deck-phase2.html)
+	@echo "Phase 1 deck: http://127.0.0.1:8777/deck.html"
+	@echo "Phase 2 deck: http://127.0.0.1:8777/deck-phase2.html   (Ctrl-C to stop)"
+	cd docs && python3 -m http.server 8777 --bind 127.0.0.1
 
 freeze:
 	$(PY) -m pip freeze > requirements-lock.txt
