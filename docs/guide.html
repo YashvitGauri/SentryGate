@@ -4,11 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SentryGate Presenter Guide</title>
+<script>try{document.documentElement.setAttribute("data-theme", localStorage.getItem("sg-guide-theme") || "dark");}catch(e){document.documentElement.setAttribute("data-theme","dark");}</script>
 <style>
 :root{
   --ink:#1d1d1f; --sub:#5f6368; --faint:#86868b; --line:#e5e5ea; --surface:#f5f5f7; --bg:#ffffff;
   --blue:#0071e3; --bluebg:#eaf3ff; --red:#d93025; --redbg:#fdecea; --green:#1f8a4c; --greenbg:#e8f5ee;
   --amber:#b7791f; --amberbg:#fdf4e3; --radius:16px;
+  --card:#ffffff; --navbg:rgba(255,255,255,.88); --wire:#c7c7cc; --boxline:#d2d2d7; --btnink:#ffffff;
+}
+/* Dark is the default: easier on the eyes, especially at night. */
+:root[data-theme="dark"]{
+  --ink:#f2f2f5; --sub:#b0b0b6; --faint:#8a8a90; --line:#2e2e33; --surface:#1f1f23; --bg:#141416;
+  --blue:#4ea1ff; --bluebg:#132a44; --red:#ff6b5e; --redbg:#3a1a17; --green:#3fcf85; --greenbg:#10301f;
+  --amber:#f0b35a; --amberbg:#33270f; --card:#1a1a1d; --navbg:rgba(20,20,22,.88); --wire:#4a4a50;
+  --boxline:#3a3a40; --btnink:#141416;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -19,11 +28,12 @@ pre{font:14px/1.55 "SF Mono",Menlo,Consolas,monospace;background:#1d1d1f;color:#
 pre .c{color:#8e8e93}
 
 /* nav */
-nav{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.88);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--line)}
-nav .in{max-width:1080px;margin:0 auto;padding:10px 20px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav{position:sticky;top:0;z-index:10;background:var(--navbg);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--line)}
+nav .in{max-width:1080px;margin:0 auto;padding:10px 20px;display:flex;gap:10px;align-items:center}
+nav .links{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
 nav a{white-space:nowrap;color:var(--sub);font-size:14px;padding:6px 11px;border-radius:999px}
 nav a:hover{background:var(--surface);color:var(--ink)}
-nav a.active{background:var(--ink);color:#fff}
+nav a.active{background:var(--ink);color:var(--bg)}
 
 main{max-width:1080px;margin:0 auto;padding:0 20px 120px}
 section{padding:72px 0 8px;border-bottom:1px solid var(--line)}
@@ -43,6 +53,7 @@ ul,ol{max-width:760px;padding-left:22px} li{margin:5px 0}
 .pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
 .pill{font-size:14px;border:1px solid var(--line);border-radius:999px;padding:6px 14px;color:var(--sub)}
 .pill b{color:var(--ink)}
+.theme{margin-left:auto;flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 12px;font-size:14px;cursor:pointer}
 
 /* boxes */
 .eli5{margin:26px 0 8px;background:var(--amberbg);border-radius:var(--radius);padding:18px 22px;max-width:860px}
@@ -55,7 +66,7 @@ ul,ol{max-width:760px;padding-left:22px} li{margin:5px 0}
 .ok{background:var(--greenbg);border-radius:12px;padding:14px 20px;max-width:860px;margin:14px 0}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.card{border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;background:#fff}
+.card{border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;background:var(--card)}
 .card h4{margin:0 0 6px;font-size:17px}
 .card p{margin:0;font-size:15.5px;color:var(--sub)}
 .num{font-size:44px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
@@ -66,34 +77,34 @@ td{border-bottom:1px solid var(--line);padding:10px;vertical-align:top}
 tr.hi td{background:var(--bluebg)}
 
 /* diagram stage */
-.stage{position:relative;border:1px solid var(--line);border-radius:20px;background:#fff;padding:54px 22px 16px;margin:22px 0}
+.stage{position:relative;border:1px solid var(--line);border-radius:20px;background:var(--card);padding:54px 22px 16px;margin:22px 0}
 .stage:fullscreen{display:flex;flex-direction:column;justify-content:center;padding:6vh 6vw;border-radius:0}
 .stage:fullscreen svg{max-height:70vh}
 .stage .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
 .stage .cap{font-size:15px;color:var(--sub);margin:10px 0 0}
-.fs{position:absolute;top:12px;right:12px;font-size:13px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;cursor:pointer;color:var(--sub)}
-.fs:hover{color:var(--ink);border-color:#c7c7cc}
-button.b{font:600 15px/1 -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;border:0;border-radius:999px;padding:11px 18px;cursor:pointer;background:var(--ink);color:#fff}
+.fs{position:absolute;top:12px;right:12px;font-size:13px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;cursor:pointer;color:var(--sub)}
+.fs:hover{color:var(--ink);border-color:var(--wire)}
+button.b{font:600 15px/1 -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;border:0;border-radius:999px;padding:11px 18px;cursor:pointer;background:var(--ink);color:var(--btnink)}
 button.b.alt{background:var(--surface);color:var(--ink)}
 button.b.red{background:var(--red);color:#fff}
 button.b.green{background:var(--green);color:#fff}
 button.b:disabled{opacity:.45;cursor:default}
 svg{width:100%;height:auto;display:block;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif}
-svg .box rect{fill:#f5f5f7;stroke:#d2d2d7;stroke-width:2;transition:fill .35s,stroke .35s}
-svg .box text{fill:#1d1d1f;font-size:19px;font-weight:600;text-anchor:middle}
-svg .box text.s{fill:#5f6368;font-size:14px;font-weight:400}
-svg .box.cache rect{fill:#fdf4e3;stroke:#e0a23b}
-svg .box.on rect{fill:#eaf3ff;stroke:#0071e3}
-svg .box.bad rect{fill:#fdecea;stroke:#d93025}
-svg .box.good rect{fill:#e8f5ee;stroke:#1f8a4c}
+svg .box rect{fill:var(--surface);stroke:var(--boxline);stroke-width:2;transition:fill .35s,stroke .35s}
+svg .box text{fill:var(--ink);font-size:19px;font-weight:600;text-anchor:middle}
+svg .box text.s{fill:var(--sub);font-size:14px;font-weight:400}
+svg .box.cache rect{fill:var(--amberbg);stroke:var(--amber)}
+svg .box.on rect{fill:var(--bluebg);stroke:var(--blue)}
+svg .box.bad rect{fill:var(--redbg);stroke:var(--red)}
+svg .box.good rect{fill:var(--greenbg);stroke:var(--green)}
 svg .box.dim{opacity:.35;transition:opacity .35s}
-svg .wire{fill:none;stroke:#c7c7cc;stroke-width:2.5}
-svg .wire.hot{stroke:#0071e3}
-svg .wire.redw{stroke:#d93025}
-svg .lab{font-size:14px;fill:#86868b}
+svg .wire{fill:none;stroke:var(--wire);stroke-width:2.5}
+svg .wire.hot{stroke:var(--blue)}
+svg .wire.redw{stroke:var(--red)}
+svg .lab{font-size:14px;fill:var(--faint)}
 svg .note{font-size:17px;font-weight:700;opacity:0;transition:opacity .4s}
 svg .note.show{opacity:1}
-svg text.red{fill:#d93025} svg text.green{fill:#1f8a4c}  /* SVG text is coloured with fill, not color */
+svg text.red{fill:var(--red)} svg text.green{fill:var(--green)}  /* SVG text is coloured with fill, not color */
 
 /* race */
 .lane{display:grid;grid-template-columns:170px 1fr 90px;gap:14px;align-items:center;margin:14px 0}
@@ -103,7 +114,7 @@ svg text.red{fill:#d93025} svg text.green{fill:#1f8a4c}  /* SVG text is coloured
 
 /* phase 1 chips */
 .chips{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:8px 0}
-.chip{border:1.5px solid var(--line);border-radius:12px;padding:10px;font-size:13.5px;line-height:1.35;min-height:84px;transition:all .4s;background:#fff}
+.chip{border:1.5px solid var(--line);border-radius:12px;padding:10px;font-size:13.5px;line-height:1.35;min-height:84px;transition:all .4s;background:var(--card)}
 .chip .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700}
 .chip.caught{border-color:var(--green);background:var(--greenbg)}
 .chip.served{border-color:var(--red);background:var(--redbg)}
@@ -114,12 +125,12 @@ svg text.red{fill:#d93025} svg text.green{fill:#1f8a4c}  /* SVG text is coloured
 
 /* experiment steps */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;counter-reset:s}
-.step{border:1.5px solid var(--line);border-radius:14px;padding:16px;transition:all .35s;background:#fff}
+.step{border:1.5px solid var(--line);border-radius:14px;padding:16px;transition:all .35s;background:var(--card)}
 .step .n{width:30px;height:30px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:700;margin-bottom:8px;transition:all .35s}
 .step h4{margin:0 0 4px;font-size:16px}
 .step p{margin:0;font-size:14.5px;color:var(--sub)}
 .step.on{border-color:var(--blue);box-shadow:0 8px 28px rgba(0,113,227,.14);transform:translateY(-3px)}
-.step.on .n{background:var(--blue);color:#fff}
+.step.on .n{background:var(--blue);color:var(--btnink)}
 
 /* sweep */
 .sweep{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;align-items:end;height:260px;padding:0 4px;border-bottom:2px solid var(--line)}
@@ -136,14 +147,14 @@ input[type=range]{width:100%;accent-color:var(--blue);margin:14px 0 4px}
 /* tabs */
 .tabs{display:inline-flex;background:var(--surface);border-radius:999px;padding:4px;gap:4px}
 .tabs button{border:0;background:transparent;border-radius:999px;padding:9px 16px;font:600 14.5px/1 -apple-system,BlinkMacSystemFont,Arial,sans-serif;cursor:pointer;color:var(--sub)}
-.tabs button.active{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.tabs button.active{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 
 /* timeline */
 .tl{position:relative;margin:24px 0;padding-left:34px}
 .tl:before{content:"";position:absolute;left:10px;top:6px;bottom:6px;width:2px;background:var(--line)}
 .tli{position:relative;margin:0 0 22px;opacity:0;transform:translateY(14px);transition:all .6s}
 .tli.seen{opacity:1;transform:none}
-.tli:before{content:"";position:absolute;left:-30px;top:6px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--line)}
+.tli:before{content:"";position:absolute;left:-30px;top:6px;width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid var(--line)}
 .tli.done:before{border-color:var(--green);background:var(--green)}
 .tli.now:before{border-color:var(--blue);background:var(--blue);box-shadow:0 0 0 6px var(--bluebg)}
 .tli.next:before{border-color:var(--amber)}
@@ -185,12 +196,13 @@ details p{margin:10px 0 0}
 </head>
 <body>
 
-<nav><div class="in" id="nav">
+<nav><div class="in"><div class="links" id="nav">
   <a href="#start">Start</a><a href="#problem">1 · The problem</a><a href="#why">2 · Why caches go first</a>
   <a href="#last">3 · Last time</a><a href="#this">4 · This time</a><a href="#exp">5 · The experiment</a>
   <a href="#results">6 · Results</a><a href="#fix">7 · The fix</a><a href="#next">8 · What's next</a>
   <a href="#files">9 · Your files</a><a href="#tomorrow">10 · Tomorrow</a><a href="#present">11 · Presenting</a>
-  <a href="#qa">12 · Questions</a><a href="#words">13 · Words</a>
+  <a href="#qa">12 · Questions</a><a href="#words">13 · Words</a></div>
+  <button class="theme" id="theme" type="button" aria-label="Switch light or dark">☀️ Light</button>
 </div></nav>
 
 <main>
@@ -430,7 +442,7 @@ details p{margin:10px 0 0}
       <g class="box cache" id="fb-c"><rect x="250" y="20" width="280" height="150" rx="14"/><text x="390" y="55">⚡ Cache, with the fix</text>
         <text class="s" x="390" y="95" id="fc1" style="opacity:0;transition:opacity .4s">1. Wording similar?  ✓ yes</text>
         <text class="s" x="390" y="125" id="fc2" style="opacity:0;transition:opacity .4s">2. Safety labels match?  ✗ no</text>
-        <text x="390" y="157" id="fc3" style="opacity:0;transition:opacity .4s;fill:#d93025;font-size:16px">→ not a match</text></g>
+        <text x="390" y="157" id="fc3" class="red" style="opacity:0;transition:opacity .4s;font-size:16px">→ not a match</text></g>
       <g class="box" id="fb-s"><rect x="620" y="195" width="180" height="70" rx="14"/><text x="710" y="236">🛡️ Safety check</text></g>
       <g class="box" id="fb-r"><rect x="840" y="195" width="150" height="70" rx="14"/><text x="915" y="226" id="fr-t">Result</text><text class="s" x="915" y="249" id="fr-s"></text></g>
     </svg>
@@ -638,8 +650,10 @@ make demo-up</pre></span></li>
   function travel(svg, ids, color, per){
     var ns = "http://www.w3.org/2000/svg";
     var c = document.createElementNS(ns, "circle");
-    c.setAttribute("r", 10); c.setAttribute("fill", color);
-    c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", 3);
+    var cs = getComputedStyle(document.documentElement);
+    var fill = color === "#0071e3" ? cs.getPropertyValue("--blue") : color === "#d93025" ? cs.getPropertyValue("--red") : color;
+    c.setAttribute("r", 10); c.setAttribute("fill", fill.trim());
+    c.setAttribute("stroke", cs.getPropertyValue("--bg").trim()); c.setAttribute("stroke-width", 3);
     svg.appendChild(c);
     var chain = Promise.resolve();
     ids.forEach(function(id){
@@ -664,6 +678,17 @@ make demo-up</pre></span></li>
     io.observe(el);
   }
   function lock(btns, on){ btns.forEach(function(b){ b.disabled = on; }); }
+
+  // light / dark toggle
+  var tb = $("#theme");
+  function paintBtn(){ var d = document.documentElement.getAttribute("data-theme")==="dark"; tb.textContent = d ? "☀️ Light" : "🌙 Dark"; }
+  tb.addEventListener("click", function(){
+    var next = document.documentElement.getAttribute("data-theme")==="dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try{ localStorage.setItem("sg-guide-theme", next); }catch(e){}
+    paintBtn();
+  });
+  paintBtn();
 
   // full screen buttons
   $$(".fs").forEach(function(b){
