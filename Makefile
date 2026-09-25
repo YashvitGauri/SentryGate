@@ -7,7 +7,7 @@ BUILD_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GATEWAY := http://127.0.0.1:8080
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx cache-reset live-smoke
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx report cache-reset live-smoke
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -108,7 +108,7 @@ eval: attacks-build     ## Regenerate every figure from the logs (bypass + laten
 MMD = problem flow architecture architecture-current
 
 diagram:        ## every mermaid source -> png, light for print + dark for the deck
-	@for d in $(MMD); do 	  npx -y @mermaid-js/mermaid-cli -i docs/$$d.mmd -o docs/$$d.png -b white -w 1800; 	  npx -y @mermaid-js/mermaid-cli -i docs/$$d.mmd -o docs/captures/$$d-dark.png -t dark -b transparent -w 2000 -s 2; 	done
+	@for d in $(MMD); do 	  npx -y @mermaid-js/mermaid-cli@11 -i docs/$$d.mmd -o docs/$$d.png -b white -w 1800; 	  npx -y @mermaid-js/mermaid-cli@11 -i docs/$$d.mmd -o docs/captures/$$d-dark.png -t dark -b transparent -w 2000 -s 2; 	done
 
 deck:           ## Rebuild docs/deck.html from the template + the captured run
 	$(PY) docs/build_deck.py
@@ -119,6 +119,12 @@ deck-phase2:    ## Rebuild docs/deck-phase2.html from the Week 4/5 results
 deck-phase2-pptx: ## Rebuild the editable PowerPoint (docs/deck-phase2.pptx)
 	@node -e "require('pptxgenjs')" 2>/dev/null || npm install --no-save pptxgenjs
 	node docs/build_deck_phase2_pptx.js
+
+report:         ## Build Progress Report-2 (reports/out/Progress2.docx + .pdf) in the college format
+	python3 reports/build_progress2.py
+	@docker image inspect sentrygate-office >/dev/null 2>&1 || docker build -q -f deploy/Dockerfile.office -t sentrygate-office .
+	docker run --rm -v $(CURDIR)/reports/out:/work sentrygate-office Progress2.docx
+	@echo "wrote reports/out/Progress2.pdf"
 
 present:        ## Serve the deck at http://127.0.0.1:8777/deck.html
 	@echo "Open http://127.0.0.1:8777/deck.html  (Ctrl-C to stop)"

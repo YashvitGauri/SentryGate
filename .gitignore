@@ -22,3 +22,6 @@ data/week5/
 .DS_Store
 node_modules/
 package-lock.json
+# Generated reports carry enrollment numbers; the repo is public.
+reports/out/
+reports/team.json

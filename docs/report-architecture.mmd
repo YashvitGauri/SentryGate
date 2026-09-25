@@ -1,0 +1,31 @@
+%% SentryGate at the end of Phase 2, drawn top-to-bottom for the progress report.
+%% Red = the hole Phase 2 measured. Amber = our contribution. Grey dashed = Phase 3.
+%% Render: make diagram
+flowchart TB
+    C["<b>CLIENT</b><br/>app · attack suite"]
+    N["<b>Nginx</b> · routing"]
+    subgraph GW[" THE GATEWAY (FastAPI) · built in Phase 2 "]
+        direction TB
+        K["<b>① CACHE LOOKUP</b> (checked first)<br/>exact match (Redis) → similarity search (Qdrant)"]
+        S["<b>② SAFETY SCREEN</b><br/>deberta injection score + Presidio personal data<br/>→ produces the SAFETY VERDICT"]
+        M["<b>③ MODEL CALL</b><br/>OpenRouter · mock / replay / live · daily spend cap"]
+        W["<b>④ STORE ANSWER</b><br/>answer + safety verdict saved together in Qdrant"]
+        FIX["<b>Phase 3 fix</b><br/>match on wording AND<br/>the stored safety verdict"]
+        L["<b>⑤ RECORD</b><br/>one JSONL line per request · /metrics/summary"]
+        K -->|"MISS"| S
+        S -->|"clean"| M --> W --> L
+    end
+    HIT["<b>HIT: answer served</b><br/>safety screen never runs<br/><b>← the hole measured in Week 4</b>"]
+    B["REFUSED 403 + reason"]
+    C --> N --> K
+    K -->|"HIT"| HIT --> L
+    S -->|"attack"| B
+    FIX -.-> K
+    classDef ours fill:#fde68a,stroke:#b45309,stroke-width:2px,color:#000
+    classDef hole fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#000
+    classDef stop fill:#fecaca,stroke:#b91c1c,color:#000
+    classDef later fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray:5 4,color:#374151
+    class K,W ours
+    class HIT hole
+    class B stop
+    class FIX later
