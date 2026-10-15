@@ -131,7 +131,7 @@ eval: attacks-build     ## Regenerate every figure from the logs (bypass + laten
 	docker run --rm -v $(CURDIR):/src -w /src sentrygate-attacks python -m eval.latency_report
 
 
-MMD = problem flow architecture architecture-current
+MMD = problem flow architecture architecture-current architecture-phase3
 
 diagram:        ## every mermaid source -> png, light for print + dark for the deck
 	@for d in $(MMD); do 	  npx -y @mermaid-js/mermaid-cli@11 -i docs/$$d.mmd -o docs/$$d.png -b white -w 1800; 	  npx -y @mermaid-js/mermaid-cli@11 -i docs/$$d.mmd -o docs/captures/$$d-dark.png -t dark -b transparent -w 2000 -s 2; 	done

@@ -139,7 +139,7 @@ exactly when you are talking about it.
 
 ---
 
-## Phase 2 so far: the gateway
+## Phases 2 and 3: the gateway and the fix
 
 ```bash
 make gateway-up      # nginx + gateway on http://127.0.0.1:8080
@@ -162,6 +162,9 @@ What exists today, and what does not:
 | Bypass reproduced on the real gateway | done (Week 4) |
 | Full Presidio personal-data scan | done (Week 5) |
 | Live tally endpoint, latency figures | done (Week 5) |
+| The defence: label-matched lookup, re-checked hits | done (Phase 3) |
+| Model picker with a fallback model | done (Phase 3) |
+| Output guard, per-caller rate and token limits | done (Phase 3) |
 
 The response headers say so on every request. On a miss:
 
@@ -206,7 +209,31 @@ Chart: [`paper/figures/bypass_vs_threshold.png`](paper/figures/bypass_vs_thresho
 
 Recorded end-to-end demo: [`docs/captures/gateway-week5.txt`](docs/captures/gateway-week5.txt) (`make gateway-demo`). Week 1 capture: [`docs/captures/gateway-week1.txt`](docs/captures/gateway-week1.txt).
 
-Full plan for the phase: [`specs/002-phase2-gateway.md`](specs/002-phase2-gateway.md).
+### The Phase 3 result
+
+The same 2,838 attack rewordings, at cache setting 0.85, in five settings.
+"Cache-caused" means the poison was served on a text the filter blocks when asked directly, so the cache is to blame.
+
+| Setting | Cache-caused, poison saved as clean | Cache-caused, poison saved as attack | Honest hits kept | Median hit |
+|---|---|---|---|---|
+| No defence | 49.8% | 49.8% | 95% | 18 ms |
+| Label match only | 47.0% | 1.5% | 95% | 8 ms |
+| Label match + re-check risky hits | 31.7% | 1.3% | 95% | 10 ms |
+| Label match + re-check every hit | **0.0%** | **0.0%** | 95% | 107 ms |
+
+Re-checking every hit is the safe setting.
+It costs about 90 ms per hit, against about 2 seconds for a real model answer.
+
+```bash
+make defence           # the Phase 3 sweep (needs Docker, about 30 minutes)
+make defence-figures   # rebuild the table and charts
+bash attacks/router_live.sh       # model picker and fallback, live (needs a key, about $0.20)
+bash attacks/mitigations_demo.sh  # output guard and rate limit, live, free
+```
+
+Results: [`data/phase3/table.md`](data/phase3/table.md), [`data/router/table.md`](data/router/table.md), [`data/mitigations/demo.txt`](data/mitigations/demo.txt).
+
+Full plan for Phase 2: [`specs/002-phase2-gateway.md`](specs/002-phase2-gateway.md).
 The paper is written alongside it in [`paper/`](paper/).
 
 ---
@@ -237,13 +264,15 @@ make demo-fast   # keyword stand-in, ~5 s
 | `make deck-phase2` | Rebuild the Phase 2 checkpoint deck from the results |
 | `make capture` | Re-record the run the deck quotes |
 | `make deck` | Rebuild `docs/deck.html` |
-| `make diagram` | Redraw both diagrams from mermaid source |
+| `make diagram` | Redraw every diagram from mermaid source |
 | `make gateway-up` | **Start the gateway** on `127.0.0.1:8080`, no key needed |
 | `make gateway-smoke` | Health, a request, and the log line it wrote |
 | `make gateway-test` | Run the test suite inside the image |
 | `make gateway-logs` / `make gateway-down` | Follow the logs / stop everything |
 | `make phase2-up` | Start Qdrant + Redis (needed from Week 3) |
 | `make cache-reset` | Clear the cache between experiments |
+| `make defence` / `make defence-figures` | Run the Phase 3 sweep / rebuild its table and charts |
+| `make lint` | Check the Python code (ruff, pinned) |
 
 ---
 
@@ -253,7 +282,7 @@ make demo-fast   # keyword stand-in, ~5 s
 |---|---|---|---|
 | **1** | 18–22 Aug | Prove the problem is real | **done** |
 | **2** | 23 Aug - 26 Sep | Build the gateway; reproduce the problem on our own running system | **done** |
-| **3** | 27 Sep – 24 Oct | Build the fix; show it beat the old version live | not started |
+| **3** | 27 Sep – 24 Oct | Build the fix; show it beat the old version live | code and results done |
 | **4** | 25 Oct – 14 Nov | Measure everything properly; write the paper | not started |
 
 Plan of record: [`specs/001-introfile.md`](specs/001-introfile.md).

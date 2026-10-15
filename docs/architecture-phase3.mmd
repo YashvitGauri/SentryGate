@@ -1,0 +1,57 @@
+%% SentryGate - what runs at the end of Phase 3.
+%% The cache is still checked first, for speed. But a hit now needs a matching
+%% safety label, and is re-checked before it is served (REVERIFY_SCOPE=all).
+%% Every answer, cached or fresh, passes the output guard.
+%% Amber = Phase 3 additions. Render: make diagram
+flowchart LR
+
+    subgraph CL[" CLIENTS "]
+        direction TB
+        APP["Any app that speaks<br/>the OpenAI API"]
+        ATK["Attack suite<br/><i>239 seeds, rewordings</i>"]
+    end
+
+    NG["<b>Nginx</b><br/>routing"]
+
+    subgraph GW[" THE GATEWAY &nbsp;&mdash;&nbsp; FastAPI "]
+        direction TB
+        RL["<b>Rate limit</b><br/>per key, per minute<br/>+ daily token budget<br/><i>too many &rarr; 429</i>"]
+        CACHE["<b>Cache lookup</b><br/>wording <b>+ safety label</b> must match"]
+        REV["<b>Re-check the hit</b><br/>same safety check, no model call<br/><i>attack &rarr; 403</i>"]
+        SCR["<b>Safety check</b><br/>deberta attack detector<br/>Presidio personal-data scan<br/><i>attack &rarr; 403</i>"]
+        RTR["<b>Model picker</b><br/>easy &rarr; cheap, hard &rarr; strong<br/>+ fallback model"]
+        OG["<b>Output guard</b><br/>script, SQL, shell, secrets<br/><i>block mode &rarr; 403</i>"]
+        STORE["Store answer<br/>+ safety label"]
+        LOG["Recorder<br/>cost, speed, outcome"]
+
+        RL --> CACHE
+        CACHE -->|hit| REV
+        CACHE -->|miss| SCR
+        REV -->|clean| OG
+        SCR -->|clean| RTR --> OG
+        OG -->|fresh answer| STORE
+        OG --> LOG
+    end
+
+    subgraph ST[" STORAGE "]
+        direction TB
+        QD[("<b>Qdrant</b><br/>meanings + safety labels<br/><i>filtered search</i>")]
+        RD[("Redis<br/>exact repeats + rate counts")]
+        JL[("Request log")]
+    end
+
+    PRV["Model provider<br/><i>OpenRouter</i>"]
+
+    APP --> NG
+    ATK --> NG
+    NG --> RL
+    CACHE <--> QD
+    CACHE <--> RD
+    STORE --> QD
+    RTR --> PRV
+    LOG --> JL
+
+    classDef ours fill:#fde68a,stroke:#b45309,stroke-width:3px,color:#000
+    classDef store fill:#dbeafe,stroke:#1d4ed8,color:#000
+    class RL,CACHE,REV,RTR,OG ours
+    class QD,RD,JL store

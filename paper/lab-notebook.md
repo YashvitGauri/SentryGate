@@ -240,3 +240,67 @@ The one open Phase 2 item is now closed. We switched the provider to OpenRouter,
 - A repeat of the question hit the cache and cost nothing.
 
 The old provider (agentrouter.org) had been rejecting the key with 401, which was an account problem, not a gateway one. OpenRouter fixed it with a base-URL swap.
+
+---
+
+## Phase 3 (from 15 October): the defence, the model picker, and two safety add-ons
+
+**Goal.** Turn the defence on, rerun the same attacks, measure the trade-off, and add the model picker, output guard and rate limits.
+
+### What we built
+
+- **Label-matched lookup.** Every question gets a cheap keyword label. A cache hit now needs the stored answer to be unflagged and to have the same label, and risky kinds of question need 0.95 similarity instead of 0.85. Qdrant does this as a filter on the search itself.
+- **Re-checking hits.** `CACHE_REVERIFY_HIGH_RISK=on` runs the safety check on a hit before serving it. `REVERIFY_SCOPE` picks risky hits only, or every hit.
+- **Phase 3 sweep (`make defence`).** Five settings, each with the poison saved as "attack" and as "clean", plus 99 honest questions with their lazy rewordings.
+- **Model picker (`ROUTER_MODE=difficulty`).** Plain rules score each question; easy goes to `openai/gpt-4o-mini`, hard to `openai/gpt-4o`. `FALLBACK_MODEL` is tried once if a call fails.
+- **Output guard (`OUTPUT_GUARD`).** Scans every answer, cache hits included, for script, SQL, shell and secret patterns.
+- **Rate limits (`RATE_LIMIT_RPM`, `TOKEN_BUDGET_PER_DAY`).** Per caller, kept in Redis.
+- **`make lint`.** A pinned code checker. It found 14 small problems in old and new code; all fixed.
+
+### What we found
+
+The smoke test changed the plan.
+With only 3 seeds, the full defence (label match plus risky re-check) still served the poison saved as "clean" about 80% of the time.
+The reason: the keyword label calls most real attacks harmless.
+Only 53 of the 239 seeds get a risky label, so most poisoned hits are never re-checked.
+We added a "re-check every hit" setting and kept the risky-only one, so the paper can show both.
+
+The full run then found a second thing.
+Even with every hit re-checked, about 29% of rewordings still got the poison.
+That is the filter's own miss rate: asked directly, it blocks only 60% of these rewordings (95% of jayavibhav, 40% of deepset).
+So we split every leak into "cache-caused" (the filter blocks that text when asked) and "filter miss", by joining each rewording to its Week 4 screen-first result.
+
+| Setting | Cache-caused, saved as clean | Cache-caused, saved as attack | Honest hits kept |
+|---|---|---|---|
+| No defence | 49.8% | 49.8% | 95.0% |
+| Label match only | 47.0% | 1.5% | 95.0% |
+| Re-check risky hits | 32.6% | 1.3% | 95.0% |
+| Both | 31.7% | 1.3% | 95.0% |
+| Label match + re-check every hit | 0.0% | 0.0% | 95.0% |
+
+Re-checking every hit costs about 90 ms per hit (107 ms against 10 to 18 ms).
+The live router run gave real model times of 1.9 to 2.7 seconds, so a re-checked hit is still about 18 times faster than a real answer, and free.
+
+This corrects two things we wrote in Phase 2.
+We said the filter scored every attack at 1.000; that was only the Phase 1 demo attack.
+We said "the fix cannot be to screen everything"; that holds for misses, but screening every hit is affordable, because what a cache saves is the model call.
+
+### Model picker, live
+
+80 real calls through OpenRouter, about $0.16 in total.
+Easy questions cost 92% less; overall 14% less, because half our set is hard and hard answers are most of the bill.
+It agreed with our labels on 39 of 40.
+The first weights sent 13 of 20 hard questions to the cheap model; we changed the rule so that any one kind of hard work is enough.
+That tuning used the same 40 questions, so 39 of 40 is optimistic.
+The fallback was tested by naming a model that does not exist; the gateway retried on the fallback and answered normally.
+
+### What went wrong
+
+- **The new settings never reached the container.** Unit tests passed, but the first live demo showed the output guard doing nothing. `OUTPUT_GUARD` and the rate-limit settings were missing from `docker-compose.yml`. Fixed, and every setting is now checked against the compose file.
+- **A blocked re-checked hit had no similarity header,** so the runner read 0.0 and counted false mismatches. It now reads the similarity from the log line.
+- **The first trade-off chart** used the slowest arm's miss time as its reference line, and did not say the miss had no model call. Redrawn with the median and a clear label.
+
+### Honest state
+
+- 88 tests pass. The code checker reports no problems.
+- Phase 3 code and results are done. The progress report and review deck are next.

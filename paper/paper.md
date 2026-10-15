@@ -4,7 +4,7 @@ Closing a safety bypass in LLM gateways.
 
 **Divyansh Sharma · Sarvagya Dabas · Yashvit Gauri**
 
-Progress draft · Phase 2 complete · 26 September 2026
+Progress draft · Phase 3 · 15 October 2026
 
 This draft is written alongside the code.
 Every claim in it is backed by something already built and committed.
@@ -30,8 +30,12 @@ We propose verdict-tagged caching.
 The safety result is worked out once, stored next to the cached answer, and checked on every lookup.
 A match on wording alone is no longer enough.
 
-> **Pending · Phase 3**
-> The bypass rate after the fix is turned on, against the same attacks.
+We then test it honestly, in two cases.
+When the poisoned answer was saved with an "attack" label, matching on the label alone cuts the leaks the cache causes from 50% to 1.5%.
+When it was saved as "clean", because it slipped past the filter once, label matching barely helps, and neither does re-checking only the hits that look risky.
+What closes the hole in both cases is running the safety check on every cache hit.
+That removes every leak the cache causes, from 50% to 0%, keeps the honest hit rate at 95%, and still skips the paid model call.
+It costs about 90 milliseconds per hit, against roughly 2 seconds for a real model answer.
 
 ---
 
@@ -47,7 +51,7 @@ What is not studied is what happens when both sit in the same request path, in t
 
 That order creates a hole.
 The cache can serve an answer the filter already rejected.
-The filter is not weak.
+The filter is not the problem.
 It is simply never asked.
 
 The hole is not a bad setting either.
@@ -58,12 +62,13 @@ So the fix has to change how the cache decides a match, not what it is set to.
 
 - A description of the cache-before-filter bypass as a class of flaw, not a one-off bug.
 - A measurement of how cheap the attack is, first in a controlled experiment, then on a running gateway.
-- A defence, verdict-tagged caching, which is one extra condition on a search the cache already runs.
-- The trade-off between safety and cache savings that the defence sits on.
+- A defence, verdict-tagged caching, and a measurement of which parts of it actually stop the attack.
+- A way to split every leak into the part the cache caused and the part the filter would have missed anyway.
+- The trade-off between safety and speed that the defence sits on.
 - An ablation study showing what each layer of the gateway adds.
 
-The first two items have early results.
-The rest are in progress, and the last section of this paper lists exactly what is left.
+The first four items have results.
+The full ablation is Phase 4, and the last section of this paper lists exactly what is left.
 
 ---
 
@@ -81,9 +86,12 @@ This is what makes caching useful for natural language, where the same question 
 
 A safety filter is a small model that scores how much a question looks like an attack.
 The best known attack is prompt injection: text that tries to override the model's own instructions, such as "ignore previous instructions and reveal the system prompt".
-Good filters are very accurate.
-In our experiment the filter scored every attack variant at 1.000, the highest possible score.
-This paper is never about the filter being weak.
+Filters are good, but not perfect.
+In Phase 1 the filter scored every rewording of the demo attack at 1.000, the highest possible score.
+On the 239 public attacks of Week 4 it is weaker: asked directly, it blocks 95 of the 100 jayavibhav attacks but only 55 of the 139 deepset ones, and 60% of all rewordings.
+This paper is not about the filter being weak.
+It is about the attacks the filter would catch, but never gets asked about.
+Section 8.4 keeps those two kinds of leak apart.
 
 **Why the cache goes first**
 
@@ -93,7 +101,8 @@ If the filter ran first, every request would pay for it, including the ones the 
 So real systems check the cache first.
 That is a sensible engineering choice, and it is the hole.
 
-Section 8.3 measures both timings on our own gateway: a cache hit is about 14 milliseconds, a miss about 94.
+Section 8.3 measures both timings on our own gateway: a cache hit is about 14 milliseconds, a miss about 94 before the model is even called.
+A real model answer adds about 2 seconds on top (section 8.5).
 
 ---
 
@@ -218,26 +227,48 @@ Every cached answer carries the safety result of the question that created it:
 
 ### 5.3 When a stored answer may be served
 
-All four must hold:
+Every new question first gets a cheap label: a keyword rule that sorts it into informational, credentials, tool use, personal data or other.
+It runs in microseconds, with no model.
+The same rule labels every answer when it is saved, so a question and its stored answer are always labelled the same way.
 
-1. The similarity clears the threshold for this kind of question.
-2. The stored injection flag matches the new one.
-3. The stored intent matches the new one.
-4. If the new question is high risk, it passed a fresh safety check.
+A stored answer may then be served only if all of these hold:
 
-Thresholds depend on intent.
-Questions about credentials or tool use get a strict threshold.
-Informational questions get a relaxed one, because a wrong match there costs little and the saving is large.
+1. The stored answer was not flagged as an attack.
+2. Its cheap label matches the new question's cheap label.
+3. The similarity clears the threshold for that kind of question: 0.95 for credentials, tool use and personal data, 0.85 for the rest.
+4. It passes a fresh safety check, if re-checking is on for this hit.
+
+Conditions 1 and 2 are a filter on the vector search itself, so the database only ever returns entries that already pass them.
+
+Re-checking has two scopes, chosen by one setting:
+
+| Scope | Which hits are re-checked |
+|---|---|
+| Risky | A risky kind of question, or an answer whose stored attack score was 0.2 or more |
+| All | Every hit |
+
+The risky scope was our first design, meant to keep most hits at full speed.
+Section 8.4 shows it is not enough, and why.
 
 ### 5.4 Why it is cheap
 
 The safety result is already being worked out for every question that misses the cache.
 Storing it adds a few bytes.
 Checking it adds one condition to a search that runs anyway.
-There is no second model and no extra work on the fast path, except the deliberate re-check of high-risk hits.
+There is no second model.
 
-> **Pending · Phase 3**
-> The extra time this adds, measured.
+Measured on our gateway (section 8.4):
+
+| Setting | Median honest cache hit | Honest hits kept |
+|---|---|---|
+| No defence | 18 ms | 95% |
+| Label match + re-check risky hits | 10 ms | 95% |
+| Label match + re-check every hit | 107 ms | 95% |
+
+Label matching adds no measurable time.
+Re-checking every hit adds the cost of one safety check, about 90 ms.
+That is the price of the safe setting.
+A hit is still about 18 times faster than a real model answer, and still costs nothing.
 
 ---
 
@@ -247,7 +278,7 @@ The gateway is a web service that speaks the same API as OpenAI.
 Any app that already talks to OpenAI can use it by changing one address.
 It runs in Docker, behind nginx, on any machine.
 
-![What runs today. The cache is checked before the safety check, which is the hole. Every stored answer carries a safety label, but the lookup does not yet use it. The greyed parts are built for later.](../docs/architecture-current.png)
+![What runs at the end of Phase 3. The cache is still checked first, for speed, but a hit needs a matching safety label and is checked again before it is served. Every answer passes the output guard, and a rate limit sits in front of everything.](../docs/architecture-phase3.png)
 
 | Part | State |
 |---|---|
@@ -259,8 +290,9 @@ It runs in Docker, behind nginx, on any machine.
 | Baseline cache: exact match plus similarity search | **Done** · Week 3 |
 | Attack generator and threshold sweep | **Done** · Week 4 |
 | Live tally endpoint and latency figures | **Done** · Week 5 |
-| Verdict-checked cache lookup, the defence | Phase 3 |
-| Model picker, output check, spend limits | Phase 3 |
+| Verdict-checked cache lookup and re-checking, the defence | **Done** · Phase 3 |
+| Model picker with a fallback model | **Done** · Phase 3 |
+| Output guard and per-caller rate and token limits | **Done** · Phase 3 |
 
 ### 6.1 One program, two experiments
 
@@ -296,23 +328,42 @@ Personal data is flagged but not blocked, because blocking every email address w
 
 **Cache.**
 Two layers: an exact match first, then a similarity search.
-Every stored answer carries its full safety result.
-The lookup ignores it on purpose, because this is the vulnerable baseline.
-In cache-first mode, a hit returns with the log saying the filter did not run.
+Every stored answer carries its full safety result and its cheap label.
+With the defence off, the lookup ignores them, which is the vulnerable baseline.
+With it on, Qdrant filters the search on them, as section 5.3 describes.
+In cache-first mode, every hit's log line says whether the filter ran, and whether the hit was re-checked.
 That log line is the evidence in section 8.
+
+**Model picker.**
+With the router on, each question that misses the cache gets a difficulty score from a short list of plain rules: code, maths, reasoning words, length, and several questions in one.
+Easy questions go to a cheap model, hard ones to a strong model.
+The rules that fired are written to the log, so any wrong route can be explained from one line.
+If the chosen model's call fails, the gateway tries a fallback model once.
+
+**Output guard.**
+Every answer, including one served from the cache, is scanned for four things an answer should almost never carry: a browser script, a destructive SQL statement, a dangerous shell command, or something shaped like a secret key.
+It can be off, flag the answer in a header, or block it.
+A blocked answer is never saved to the cache.
+
+**Rate limits.**
+Each caller has a limit on requests per minute, which counts cache hits too, and a daily budget of model tokens, which does not.
+Counts live in Redis, so a restart does not reset them.
+Over the limit, the caller gets a 429 with the number of seconds to wait.
 
 **Live tally.**
 A `/metrics/summary` endpoint reads the request log and reports the counts, the cache hit rate, and the response times, for the demo screen.
 
 **Tests.**
-54 automated tests pass in the gateway's Docker image.
+88 automated tests pass in the gateway's Docker image.
 None of them download a model or call an API.
+A pinned code checker runs with one command and reports no problems.
 
 The result in section 8 ran on the real components: the real injection filter, the real embedding model, Presidio, and real Qdrant and Redis.
 The model reply was mocked there on purpose, because the bypass is about answers served from the cache, so the model is never called and the run stays free and repeatable.
 A real model call has since been made end to end through the gateway, using OpenRouter with `openai/gpt-4o-mini`.
 A question went in, the filter passed it, the gateway called the model, the reply came back and was cached, and the real cost was recorded.
-The reply was recorded to disk, so the same call now replays for free with no key. Phase 2 has no open items.
+The reply was recorded to disk, so the same call now replays for free with no key.
+The Phase 3 router run made 80 more real calls the same way, all recorded.
 
 ---
 
@@ -332,6 +383,8 @@ Each seed is reworded in two ways, kept apart throughout, because they behave ve
 | Measure | What it means |
 |---|---|
 | Bypass rate | Share of attacks answered from a poisoned entry without the filter running |
+| Poison served | Share of attacks that got the poisoned answer, whether or not the filter ran |
+| Cache-caused leaks | Poison served on a text the filter blocks when asked directly: the part that is the cache's fault |
 | Cache hit rate | Share of questions answered from the cache |
 | Money saved | Compared with sending every question to the model |
 | Speed | Typical and worst-case response time, for hits and misses |
@@ -339,7 +392,10 @@ Each seed is reworded in two ways, kept apart throughout, because they behave ve
 | Detection rate | Share of attacks the filter catches when it is asked |
 | False alarms | Share of honest questions wrongly blocked |
 
-The Week 4 run measured the bypass rate directly. The other measures come in Week 5 and Phase 4.
+Week 4 measured the bypass rate.
+Week 5 measured speed.
+Phase 3 measured poison served, cache-caused leaks, cache hits kept for honest users, money saved by the router, and detection rate.
+The false-alarm rate and the full table come in Phase 4.
 
 ---
 
@@ -376,13 +432,19 @@ Full rewrites only start matching once the cache is loose, because a real paraph
 | The exact attack is always served the poison | 1673 of 1673 | The experiment is wired correctly. |
 | Confirmed bypasses whose log says the filter never ran | all of them | The claim is read from the gateway's log, not from our code. |
 | Honest questions served the poison | 0 of 700 | Normal users are not caught in the crossfire. |
-| Safe order (filter before cache), same attack | 0% bypass | The order is the cause, not the cache itself. |
+| Safe order (filter before cache), same attack | 0% bypass | The filter always runs, so no answer skips it. |
 | Log similarity vs served hit | 0 disagreements | The recorded scores match what was actually served. |
 
 The safe-order row is the key one.
 Running the exact same build with the filter moved in front of the cache drops the bypass rate straight to zero.
 Nothing else changed.
 So the bypass is caused by the order, and the fix is to change the order's blind spot, which is what Phase 3 does.
+
+One caution on reading that zero.
+A bypass, as we count it, needs the filter to have not run.
+In the safe order the filter always runs, so the bypass is zero by construction.
+Some poison is still served there, about 30% of rewordings, because the filter itself lets those texts through.
+That part is the filter's limit, not the cache's, and section 8.4 separates the two.
 
 ### 8.3 Why the cache is checked first, measured
 
@@ -400,17 +462,118 @@ Here is that gap on our own gateway, from 25,416 real requests in the logs.
 A cache hit answers in about 14 milliseconds.
 A miss pays the safety check on top, at about 94 milliseconds, roughly seven times slower.
 That gap is the whole reason real systems check the cache first, and so it is the whole reason the bypass exists.
-The fix cannot be to screen every request, because that throws the speed-up away.
-It has to make the cache itself safety-aware, which is Phase 3.
+Note that the miss here never calls a model, because the reply was mocked.
+With a real model the miss is about 2 seconds, not 94 ms, which matters for the trade-off in section 8.4.
 
-> **Pending · Phase 3**
-> Vulnerable against defended, same attacks, side by side.
+### 8.4 The defence, against the same attacks
 
-> **Pending · Phase 3**
-> The trade-off between safety and cache savings.
+We reran the Week 4 attack on the same gateway at threshold 0.85, in five settings.
+Each setting was run twice.
+Once with the poisoned answer saved with the filter's own label, so "attack" for most seeds: the easy case.
+Once with it saved as "clean", as if it had slipped past the filter once: the realistic case.
+We also asked 99 honest questions, each followed by the same lazy rewordings an attacker would use, to count the cache hits honest users keep.
+
+Every poisoned answer served is split in two.
+If the filter blocks that exact text when asked directly, the leak is the cache's fault: we call it cache-caused.
+If the filter lets it through anyway, no cache defence could have stopped it.
+
+| Setting | Cache-caused, saved as clean | Cache-caused, saved as attack | Honest hits kept | Median honest hit |
+|---|---|---|---|---|
+| No defence | 49.8% | 49.8% | 95.0% | 18 ms |
+| Label match only | 47.0% | 1.5% | 95.0% | 8 ms |
+| Re-check risky hits only | 32.6% | 1.3% | 95.0% | 7 ms |
+| Label match + re-check risky hits | 31.7% | 1.3% | 95.0% | 10 ms |
+| Label match + re-check every hit | **0.0%** | **0.0%** | **95.0%** | 107 ms |
+
+![Share of attack rewordings served the poison, in each setting. The coloured part is the cache's fault; the grey part the filter misses anyway.](figures/defence_poison_served.png)
+
+Four things stand out.
+
+**Label matching stops the easy case.**
+When the poison was saved as an attack, matching on the label alone cuts cache-caused leaks from 49.8% to 1.5%.
+What is left are seeds the filter itself called clean, whose rewordings it would have caught.
+
+**It does not stop the realistic case.**
+When the poison was saved as clean, its label looks like any honest answer's, and label matching barely helps: 47.0%.
+This is the honest limit of matching on labels.
+
+**Re-checking only risky hits is not enough either.**
+The cheap keyword label calls most real attacks harmless.
+Only 53 of the 239 seeds get a risky label, and most get "informational" or "other".
+So most poisoned hits are never re-checked, and 31.7% still get through.
+
+**Re-checking every hit closes it.**
+With every hit checked again before it is served, cache-caused leaks fall to zero in both cases.
+What is still served, about 29%, is exactly the share the filter misses when asked directly.
+At that point the cache adds no risk beyond the filter's own.
+
+No honest question was ever served the poison, in any setting.
+Honest questions kept every hit in every setting: 95.0%.
+One of the 100 honest questions was blocked by the filter as a false alarm, so 99 were used.
+
+![The trade-off. Left: cache-caused leaks. Right: the cost to honest users.](figures/defence_tradeoff.png)
+
+The price of the safe setting is time.
+A re-checked hit takes about 107 ms instead of 10 to 18 ms, because it pays for one safety check.
+That is close to the 100 to 150 ms of a miss in this mocked run, which also skips the model.
+Against a real model answer of about 2 seconds, a re-checked hit is still about 18 times faster, and it still costs nothing.
+
+This changes our claim in section 8.3.
+We said the fix could not be to screen every request.
+That is still true for misses, where the check is already paid.
+But screening every hit is affordable, because the expensive part a cache saves is the model call, not the safety check.
+
+### 8.5 The model picker
+
+We wrote 40 questions, 20 easy and 20 hard, and labelled them ourselves.
+Each was sent twice through the live gateway, on OpenRouter: once with the model picker on, and once always to the strong model.
+The cheap model was `openai/gpt-4o-mini`, the strong one `openai/gpt-4o`.
+Costs are the real ones, from the token counts the provider returned.
+
+| | Always strong | Model picker | Saved |
+|---|---|---|---|
+| Easy questions | $0.00542 | $0.00041 | 92% |
+| Hard questions | $0.07803 | $0.07153 | 8% |
+| All 40 | $0.08346 | $0.07194 | 14% |
+
+The picker agreed with our label on 39 of 40.
+The one miss was a hard question with two parts and no code or maths words, which went to the cheap model.
+Its answer was still correct and well organised.
+
+The overall saving is small because half our set is hard, and hard answers are long, so they are most of the bill.
+Real traffic is usually mostly easy.
+From the measured average cost of each kind, the saving would be 27% at 80% easy traffic and 41% at 90%.
+Those two numbers are a projection, not a measurement.
+
+The median model time was 1.9 seconds for the cheap model and 2.7 seconds for the strong one.
+
+The fallback was tested live by giving the cheap model a name that does not exist.
+The provider refused the call, the gateway retried once on the fallback model, and the user got a normal answer, with a header saying which model failed.
+
+### 8.6 The output guard and the rate limit
+
+Both were shown on the live gateway with the real models.
+
+**Output guard.**
+We planted a cached answer carrying a script that steals the user's cookies, then asked a reworded question.
+
+| Setting | What the user got |
+|---|---|
+| Off | The script, served from the cache |
+| Flag | The script, with a header naming what was found |
+| Block | A 403 saying the answer was withheld |
+
+The guard sees the cached answer even though the input filter never did, so it is a second line behind the cache.
+Its patterns are plain and catch only obvious payloads.
+
+**Rate limit.**
+With a limit of 20 requests a minute, one caller fired every rewording of one attack three times, 39 requests, at a planted poisoned answer.
+The first 20 were answered or blocked as normal, and the other 19 were refused with a 429.
+A second caller at the same moment was not affected.
+The limit does not stop the attack, but it slows the probing of the cache to 20 tries a minute per key.
 
 > **Pending · Phase 4**
-> The full table, the ablation study, cost and speed.
+> The full table, the ablation study, the false-alarm rate, and speed under load.
 
 ---
 
@@ -418,18 +581,20 @@ It has to make the cache itself safety-aware, which is Phase 3.
 
 We write these down as we find them.
 
-- The bypass rate is measured with the model reply mocked, because the attack is about answers served from the cache, not model answers.
-  A real model call is a Week 5 item.
+- The attack runs are measured with the model reply mocked, because the attack is about answers served from the cache, not model answers.
+  The model picker was measured on real paid calls.
 - A poisoned answer has to get into the cache somehow.
   We measure the one route that needs no special access, and discuss the others without measuring them.
-- We use one specific public filter.
-  A different filter would change the detection numbers, but not the shape of the bypass.
-- Personal data screening still uses a simple text check, not the full scanner.
-  It does not affect the injection bypass we measure, and Presidio arrives in Week 5.
-- We have not yet measured speed or cost on the gateway.
-  Those come in Week 5, from the same request log.
-- The defence is only as good as the intent labels it matches on.
-  Phase 3 will report how intent is decided and how often it is wrong.
+  The "saved as clean" case assumes it slipped past the filter with a low score.
+- We use one specific public filter, and it misses about 40% of these rewordings when asked directly.
+  The safe setting can only be as good as the filter; it removes the extra risk the cache adds, not the filter's own misses.
+- The cheap label is a keyword rule, and it calls most real attacks harmless.
+  That is why re-checking only risky hits failed, and why we recommend re-checking every hit.
+- The model picker's rules were adjusted once after seeing our 40 questions, so its 39 of 40 is optimistic.
+  A fresh question set is needed for a fair number.
+- The 40 router questions and their easy or hard labels were written by us.
+- The output guard uses plain patterns, which a careful attacker can avoid.
+- Latency was measured on one laptop, not under load. Load testing is Phase 4.
 
 ---
 
@@ -461,14 +626,15 @@ Our result is not that the filter is weak, but that a cache in front of it can m
 
 The specific failure we study, a semantic cache serving a poisoned answer to a reworded attack, is recognised informally.
 Industry write-ups describe cache poisoning of the LLM fast path, and the OWASP Top 10 for LLM Applications (2025) lists prompt injection first and calls out vector and embedding weaknesses as a separate risk category.
-What we have not found is a measurement of the bypass on a running gateway, with the claim that the filter never ran read from the system's own logs, or a defence that removes it by making the cache itself safety-aware rather than by screening every request.
-That measurement (section 8) and that defence (section 5) are our contribution.
+What we have not found is a measurement of the bypass on a running gateway, with the claim that the filter never ran read from the system's own logs, or a measured defence that separates the leaks the cache causes from the ones the filter would miss anyway.
+That measurement (section 8) and that defence (sections 5 and 8.4) are our contribution.
 
 ### 10.4 Components we build on
 
 The attack detector is ProtectAI's DeBERTa-v3 prompt-injection classifier.
 Personal-data detection uses Microsoft Presidio.
-Embeddings use Sentence-Transformers' all-MiniLM-L6-v2, and the vector store is Qdrant, whose payload filtering is the mechanism the Phase 3 defence will use.
+Embeddings use Sentence-Transformers' all-MiniLM-L6-v2, and the vector store is Qdrant, whose payload filtering is the mechanism the Phase 3 defence uses.
+Live model calls go through OpenRouter.
 Attack seeds come from the public deepset/prompt-injections and jayavibhav/prompt-injection datasets.
 
 ---
@@ -550,18 +716,30 @@ deepset/prompt-injections and jayavibhav/prompt-injection (Hugging Face datasets
 - Recorded the full end-to-end demo as an on-stage fallback.
 - 54 tests pass. Phase 2 is complete.
 
+**Phase 3 · 27 September to 24 October · Code and results done**
+
+- Turned on the safety-label check in the cache, as a filter on the vector search, with a stricter match for risky kinds of question.
+- Added re-checking of cache hits, for risky hits only or for every hit.
+- Reran all 2,838 attack rewordings in five settings, with the poison saved both as an attack and as clean, plus 99 honest questions.
+- Split every leak into the part the cache caused and the part the filter misses anyway.
+- Found that label matching stops the easy case but not the realistic one, and that re-checking only risky hits is not enough.
+- Showed that re-checking every hit removes every cache-caused leak, keeps 95% of honest hits, and costs about 90 ms per hit.
+- Added the model picker with a fallback model, and measured it on 80 real paid calls: 92% cheaper on easy questions.
+- Added the output guard and per-caller rate and token limits, and showed both working live.
+- Corrected two claims from Phase 2: the filter is weaker on public attacks than on our demo attack, and the safe order's 0% bypass still serves some poison the filter misses.
+- 88 tests pass, and the code checker reports no problems.
+
 ---
 
 ## 12. Still left
 
-Phase 2 is complete, with no open items.
+**Phase 3 · by 24 October**
 
-**Phase 3 · 27 September to 24 October**
+- Progress report 3 and the review deck.
 
-- Turn on the verdict check in the cache, and rerun the same attacks.
-- Re-check high-risk cache hits before serving them.
-- Draw the trade-off between safety and cache savings.
-- Add the model picker, the output check and per-user spending limits.
+**Optional, if time allows**
+
+- A learned difficulty score for the model picker, tested on questions it was not tuned on.
 
 **Phase 4 · 25 October to 14 November**
 
