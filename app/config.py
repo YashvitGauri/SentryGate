@@ -89,6 +89,12 @@ class Settings:
     cache_reverify_high_risk: bool
     router_mode: str
     sim_threshold: float
+    # Phase 3: risky kinds of question (credentials, tool use, personal data)
+    # need a closer match before a cached answer is reused.
+    cache_strict_threshold: float
+    # Phase 3: a cached answer whose stored injection score is at least this
+    # was a close call when it was saved, so it is re-checked before serving.
+    reverify_score: float
 
     # --- screening (Week 2) -------------------------------------------------
     injection_threshold: float
@@ -130,6 +136,8 @@ class Settings:
             cache_reverify_high_risk=_bool("CACHE_REVERIFY_HIGH_RISK", False),
             router_mode=_one_of("ROUTER_MODE", "fixed", ROUTER_MODES),
             sim_threshold=_float("SIM_THRESHOLD", 0.85),
+            cache_strict_threshold=_float("CACHE_STRICT_THRESHOLD", 0.95),
+            reverify_score=_float("REVERIFY_SCORE", 0.2),
             injection_threshold=_float("INJECTION_THRESHOLD", 0.5),
             screening_scorer=_one_of("SCREENING_SCORER", "auto", SCREENING_SCORERS),
             embed_model=_str("EMBED_MODEL", "all-MiniLM-L6-v2"),
@@ -156,6 +164,10 @@ class Settings:
     def validate(self) -> None:
         if not 0.0 < self.sim_threshold <= 1.0:
             raise ConfigError(f"SIM_THRESHOLD must be between 0 and 1, got {self.sim_threshold}")
+        if not 0.0 < self.cache_strict_threshold <= 1.0:
+            raise ConfigError(f"CACHE_STRICT_THRESHOLD must be between 0 and 1, got {self.cache_strict_threshold}")
+        if not 0.0 <= self.reverify_score <= 1.0:
+            raise ConfigError(f"REVERIFY_SCORE must be between 0 and 1, got {self.reverify_score}")
         if not 0.0 < self.injection_threshold <= 1.0:
             raise ConfigError(
                 f"INJECTION_THRESHOLD must be between 0 and 1, got {self.injection_threshold}"
@@ -180,6 +192,8 @@ class Settings:
             "reverify": "on" if self.cache_reverify_high_risk else "off",
             "router": self.router_mode,
             "sim_threshold": self.sim_threshold,
+            "strict_threshold": self.cache_strict_threshold,
+            "reverify_score": self.reverify_score,
             "provider_mode": self.provider_mode,
             "build_sha": self.build_sha,
         }

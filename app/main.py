@@ -29,6 +29,7 @@ from app.schemas import (
     user_prompt,
 )
 from app.screening import build_screener
+from app.verdict import classify_intent
 
 STARTED_AT = time.time()
 
@@ -206,18 +207,62 @@ def _blocked_response(request: Request, verdict) -> JSONResponse:
     return blocked
 
 
-def _lookup_cache(request: Request, prompt: str, prompt_hash_value: str, threshold: float):
+# Kinds of question where a wrong cached answer does the most damage.
+HIGH_RISK_INTENTS = ("credentials", "tool_use", "pii")
+
+
+def _cache_policy(settings: Settings, prompt: str):
+    """Decide what a stored answer must carry to be served for this question.
+
+    Returns (cheap_intent, require, threshold). The baseline returns no
+    requirement and the global threshold: any similar answer is served, which
+    is the hole. With the Phase 3 defence the question gets a cheap label from
+    keyword rules, which costs almost nothing, so the cache can stay in front
+    of the slow safety check. A stored answer is then served only if its saved
+    label says it was not an attack and is the same kind of question, and
+    risky kinds need a closer match.
+    """
+    if not (settings.cache_verdict_filter or settings.cache_reverify_high_risk):
+        return None, None, settings.sim_threshold
+    cheap_intent = classify_intent(prompt)
+    if not settings.cache_verdict_filter:
+        return cheap_intent, None, settings.sim_threshold
+    threshold = settings.cache_strict_threshold if cheap_intent in HIGH_RISK_INTENTS else settings.sim_threshold
+    return cheap_intent, {"is_injection": False, "label_intent": cheap_intent}, threshold
+
+
+def _needs_recheck(settings: Settings, cheap_intent: str | None, payload: dict | None) -> bool:
+    """Should a cache hit go through the full safety check before it is served?
+
+    Only when re-checking is on, and only for the hits most likely to be
+    wrong: a risky kind of question, or an answer that was a close call (or
+    flagged) when it was saved. Everything else keeps the speed of a hit.
+    """
+    if not settings.cache_reverify_high_risk:
+        return False
+    payload = payload or {}
+    return (
+        cheap_intent in HIGH_RISK_INTENTS
+        or bool(payload.get("is_injection"))
+        or float(payload.get("injection_score", 0.0)) >= settings.reverify_score
+    )
+
+
+def _lookup_cache(request: Request, prompt: str, prompt_hash_value: str, threshold: float,
+                  require: dict | None = None, cheap_intent: str | None = None):
     """Embed and search. Records outcome, similarity and timings on the log."""
     record = request.state.record
     cache: SemanticCache = request.app.state.cache
     with record.stage("embed"):
         vector = cache.embedder.embed(prompt)
     with record.stage("cache"):
-        result = cache.lookup_with_vector(prompt_hash_value, vector)
+        result = cache.lookup_with_vector(prompt_hash_value, vector, require, threshold)
     record.cache_outcome = "hit" if result.hit else "miss"
     record.cache_similarity = result.similarity
     record.cache_matched_id = result.matched_id
     record.cache_threshold = threshold
+    record.cache_filter = require is not None
+    record.cheap_intent = cheap_intent
     return result, vector
 
 
@@ -243,9 +288,19 @@ def chat_completions(
     record.prompt_len = len(prompt)
 
     if settings.pipeline_order == "cache_first":
-        result, _ = _lookup_cache(request, prompt, prompt_hash_value, settings.sim_threshold)
+        cheap_intent, require, threshold = _cache_policy(settings, prompt)
+        result, _ = _lookup_cache(request, prompt, prompt_hash_value, threshold, require, cheap_intent)
         if result.hit:
-            # Vulnerable on purpose: served with screening_ran=False.
+            if _needs_recheck(settings, cheap_intent, result.payload):
+                # Phase 3: a risky or close-call hit pays for the full check.
+                record.reverified = True
+                verdict = _screen_prompt(request, response, prompt)
+                if verdict.is_injection:
+                    return _blocked_response(request, verdict)
+            else:
+                # Baseline behaviour: served with screening_ran=False.
+                response.headers["X-SentryGate-Screened"] = "false"
+                response.headers["X-SentryGate-Verdict"] = "unscreened"
             hit_response = _serve_hit(result.payload or {}, result.similarity, result.matched_id or "")
             record.model_used = (result.payload or {}).get("model", model)
             record.provider_source = "cache"
@@ -253,8 +308,6 @@ def chat_completions(
             record.tokens_out = estimate_tokens((result.payload or {}).get("response", ""))
             record.cost_usd = 0.0
             response.headers["X-SentryGate-Provider"] = "cache"
-            response.headers["X-SentryGate-Screened"] = "false"
-            response.headers["X-SentryGate-Verdict"] = "unscreened"
             response.headers["X-SentryGate-Cache"] = "hit"
             response.headers["X-SentryGate-Similarity"] = f"{result.similarity:.3f}"
             return hit_response

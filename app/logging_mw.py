@@ -72,6 +72,9 @@ class RequestRecord:
     cache_similarity: float | None = None
     cache_matched_id: str | None = None
     cache_threshold: float | None = None
+    cache_filter: bool = False          # Phase 3: lookup required a matching safety label
+    cheap_intent: str | None = None     # Phase 3: the keyword label used for that
+    reverified: bool = False            # Phase 3: hit re-checked before serving
 
     provider_source: str | None = None
     tokens_in: int = 0
@@ -103,12 +106,15 @@ class RequestRecord:
             "prompt_hash": self.prompt_hash,
             "prompt_len": self.prompt_len,
             "screening_ran": self.screening_ran,
+            "reverified": self.reverified,
             "verdict": self.verdict,
             "cache": {
                 "outcome": self.cache_outcome,
                 "similarity": self.cache_similarity,
                 "matched_id": self.cache_matched_id,
                 "threshold": self.cache_threshold,
+                "filter": self.cache_filter,
+                "cheap_intent": self.cheap_intent,
             },
             "provider": self.provider_source,
             "tokens": {"in": self.tokens_in, "out": self.tokens_out},

@@ -26,6 +26,8 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from app.verdict import classify_intent
+
 EMBED_MODEL = "all-MiniLM-L6-v2"
 EMBED_DIM = 384
 
@@ -79,6 +81,19 @@ class SentenceTransformerEmbedder:
         return [float(v) for v in self.model.encode(text, normalize_embeddings=True)]
 
 
+def payload_matches(payload: dict | None, require: dict | None) -> bool:
+    """True when a stored entry's safety label satisfies the requirement.
+
+    require is None for the vulnerable baseline: any similar entry may be
+    served. With the Phase 3 defence it holds the fields that must agree,
+    for example {"is_injection": False, "intent": "informational"}.
+    """
+    if not require:
+        return True
+    payload = payload or {}
+    return all(payload.get(k) == v for k, v in require.items())
+
+
 @dataclass
 class CacheEntry:
     entry_id: str
@@ -117,10 +132,12 @@ class MemoryVectorStore:
     def __init__(self):
         self.entries: list[CacheEntry] = []
 
-    def search(self, vector: list[float], threshold: float) -> LookupResult:
+    def search(self, vector: list[float], threshold: float, require: dict | None = None) -> LookupResult:
         best: CacheEntry | None = None
         best_sim = -1.0
         for entry in self.entries:
+            if not payload_matches(entry.payload, require):
+                continue
             sim = cosine_similarity(vector, entry.vector)
             if sim > best_sim:
                 best_sim = sim
@@ -195,11 +212,24 @@ class QdrantVectorStore:
                 collection_name=collection,
                 vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
             )
+        # Index the label fields the defence filters on, so the filter runs
+        # inside the vector search rather than after it.
+        from qdrant_client.http.models import PayloadSchemaType
+        for field_name, schema in (("is_injection", PayloadSchemaType.BOOL), ("label_intent", PayloadSchemaType.KEYWORD)):
+            try:
+                self.client.create_payload_index(self.collection, field_name=field_name, field_schema=schema)
+            except Exception:
+                pass  # already indexed
         self.backend = "qdrant"
 
-    def search(self, vector: list[float], threshold: float) -> LookupResult:
+    def search(self, vector: list[float], threshold: float, require: dict | None = None) -> LookupResult:
+        query_filter = None
+        if require:
+            from qdrant_client.http.models import FieldCondition, Filter, MatchValue
+
+            query_filter = Filter(must=[FieldCondition(key=k, match=MatchValue(value=v)) for k, v in require.items()])
         points = self.client.query_points(
-            collection_name=self.collection, query=vector, limit=1, with_payload=True
+            collection_name=self.collection, query=vector, query_filter=query_filter, limit=1, with_payload=True
         ).points
         if not points:
             return LookupResult(False, 0.0, None, None)
@@ -247,13 +277,22 @@ class SemanticCache:
     stats: dict = field(default_factory=lambda: {"hits": 0, "misses": 0, "upserts": 0})
 
     def lookup_with_vector(
-        self, prompt_hash: str, vector: list[float]
+        self, prompt_hash: str, vector: list[float],
+        require: dict | None = None, threshold: float | None = None,
     ) -> LookupResult:
+        """Exact match first, then similarity search.
+
+        require and threshold come from the request: None means the baseline
+        (any similar entry, global threshold). The defence passes the safety
+        label the stored entry must carry, and a stricter threshold for risky
+        kinds of question.
+        """
         exact_hit = self.exact.get(prompt_hash)  # type: ignore[attr-defined]
-        if exact_hit is not None:
+        if exact_hit is not None and payload_matches(exact_hit.payload, require):
             self.stats["hits"] += 1
             return LookupResult(True, 1.0, exact_hit.entry_id, exact_hit.payload)
-        result = self.vector.search(vector, self.threshold)  # type: ignore[attr-defined]
+        limit = self.threshold if threshold is None else threshold
+        result = self.vector.search(vector, limit, require)  # type: ignore[attr-defined]
         if result.hit:
             self.stats["hits"] += 1
         else:
@@ -285,6 +324,12 @@ class SemanticCache:
             "is_injection": bool(verdict.get("is_injection", False)),
             "has_pii": bool(verdict.get("has_pii", False)),
             "intent": str(verdict.get("intent", "other")),
+            # The same cheap keyword label an incoming question gets before the
+            # cache is checked. The defence matches on this, not on "intent",
+            # because "intent" also uses the personal-data scan, which an
+            # incoming question has not had yet; matching across the two rules
+            # would turn honest repeats into misses.
+            "label_intent": classify_intent(prompt),
             "risk_level": str(verdict.get("risk_level", "low")),
             "injection_score": float(verdict.get("injection_score", 0.0)),
             "embed_model": self.embed_model,
