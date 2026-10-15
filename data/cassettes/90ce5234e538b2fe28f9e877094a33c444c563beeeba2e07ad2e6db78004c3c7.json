@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "There are seven continents on Earth: Asia, Africa, North America, South America, Antarctica, Europe, and Australia. However, it\u2019s worth noting that in some models, particularly in certain educational contexts, Europe and Asia may be referred to as a single continent called \"Eurasia,\" which could lead to the classification of only six continents. But the most widely accepted model recognizes seven continents.",
+  "tokens_in": 13,
+  "tokens_out": 79,
+  "recorded_at": "2026-10-15T07:54:55Z"
+}

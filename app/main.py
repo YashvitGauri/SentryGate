@@ -19,7 +19,10 @@ from pydantic import BaseModel, Field
 from app.cache import SemanticCache, build_cache
 from app.config import Settings, get_settings
 from app.logging_mw import JsonlWriter, RequestLogMiddleware
-from app.providers import Provider, ProviderError, build_provider, estimate_tokens
+from app.providers import Provider, ProviderError, UpstreamError, build_provider, estimate_tokens
+from app.mitigations.output_guard import scan as scan_output
+from app.mitigations.rate_limit import build_rate_limiter
+from app.router import route
 from app.schemas import (
     ChatCompletionRequest,
     ChatMessage,
@@ -41,6 +44,7 @@ async def lifespan(app: FastAPI):
     app.state.provider = build_provider(settings)
     app.state.screener, app.state.screening_info = build_screener(settings)
     app.state.cache, app.state.cache_info = build_cache(settings)
+    app.state.rate_limiter, app.state.rate_limit_info = build_rate_limiter(settings)
     app.state.log_writer = JsonlWriter(settings.log_path)
     app.state.log_config = runtime_log_config(
         settings, app.state.screening_info, app.state.cache_info
@@ -111,6 +115,7 @@ def healthz() -> dict:
         "screening": getattr(app.state, "screening_info", {"mode": "unknown"}),
         "cache": cache_info,
         "cache_seed_enabled": settings.allow_cache_seed,
+        "rate_limit": getattr(app.state, "rate_limit_info", {}),
     }
 
 
@@ -207,6 +212,38 @@ def _blocked_response(request: Request, verdict) -> JSONResponse:
     return blocked
 
 
+def _rate_limited(request: Request, decision) -> JSONResponse:
+    _note_refusal(request, decision.reason)
+    what = "requests per minute" if decision.reason == "rate_limited" else "model tokens per day"
+    refused = _error(429, f"Too many {what} for this key (limit {decision.limit}). "
+                          f"Try again in {decision.retry_after_s} s.", "rate_limit_exceeded", decision.reason)
+    refused.headers["Retry-After"] = str(decision.retry_after_s)
+    refused.headers["X-RateLimit-Limit"] = str(decision.limit)
+    refused.headers["X-RateLimit-Remaining"] = "0"
+    return refused
+
+
+def _guard_output(request: Request, response: Response, text: str) -> JSONResponse | None:
+    """Phase 3 output guard. Returns a refusal in block mode, else None."""
+    settings: Settings = request.app.state.settings
+    if settings.output_guard == "off":
+        return None
+    record = request.state.record
+    flags = scan_output(text)
+    record.output_flags = flags
+    if not flags:
+        return None
+    if settings.output_guard == "flag":
+        response.headers["X-SentryGate-Output-Flags"] = ",".join(flags)
+        return None
+    _note_refusal(request, "unsafe_output")
+    refused = _error(403, f"Answer withheld by SentryGate: it contained {', '.join(flags)}.",
+                     "sentrygate_blocked", "unsafe_output")
+    refused.headers["X-SentryGate-Output-Flags"] = ",".join(flags)
+    refused.headers["X-SentryGate-Cache"] = record.cache_outcome
+    return refused
+
+
 # Kinds of question where a wrong cached answer does the most damage.
 HIGH_RISK_INTENTS = ("credentials", "tool_use", "pii")
 
@@ -234,12 +271,15 @@ def _cache_policy(settings: Settings, prompt: str):
 def _needs_recheck(settings: Settings, cheap_intent: str | None, payload: dict | None) -> bool:
     """Should a cache hit go through the full safety check before it is served?
 
-    Only when re-checking is on, and only for the hits most likely to be
-    wrong: a risky kind of question, or an answer that was a close call (or
-    flagged) when it was saved. Everything else keeps the speed of a hit.
+    Only when re-checking is on. With REVERIFY_SCOPE=all, every hit is
+    checked. With risky (the default), only the hits most likely to be wrong:
+    a risky kind of question, or an answer that was a close call (or flagged)
+    when it was saved. Everything else keeps the speed of a hit.
     """
     if not settings.cache_reverify_high_risk:
         return False
+    if settings.reverify_scope == "all":
+        return True
     payload = payload or {}
     return (
         cheap_intent in HIGH_RISK_INTENTS
@@ -273,11 +313,19 @@ def chat_completions(
     body: ChatCompletionRequest, request: Request, response: Response
 ) -> ChatCompletionResponse | JSONResponse:
     settings: Settings = app.state.settings
-    provider: Provider = app.state.provider
     record = request.state.record
 
     if body.stream:
         raise StreamingNotSupported()
+
+    limiter = request.app.state.rate_limiter
+    if limiter.enabled:
+        decision = limiter.check(record.api_key_id)
+        if not decision.allowed:
+            return _rate_limited(request, decision)
+        if decision.limit:
+            response.headers["X-RateLimit-Limit"] = str(decision.limit)
+            response.headers["X-RateLimit-Remaining"] = str(decision.remaining)
 
     model = body.model or settings.default_model
     prompt = user_prompt(body.messages)
@@ -301,6 +349,9 @@ def chat_completions(
                 # Baseline behaviour: served with screening_ran=False.
                 response.headers["X-SentryGate-Screened"] = "false"
                 response.headers["X-SentryGate-Verdict"] = "unscreened"
+            refused = _guard_output(request, response, (result.payload or {}).get("response", ""))
+            if refused is not None:
+                return refused
             hit_response = _serve_hit(result.payload or {}, result.similarity, result.matched_id or "")
             record.model_used = (result.payload or {}).get("model", model)
             record.provider_source = "cache"
@@ -322,6 +373,9 @@ def chat_completions(
         return _blocked_response(request, verdict)
     result, _ = _lookup_cache(request, prompt, prompt_hash_value, settings.sim_threshold)
     if result.hit:
+        refused = _guard_output(request, response, (result.payload or {}).get("response", ""))
+        if refused is not None:
+            return refused
         hit_response = _serve_hit(result.payload or {}, result.similarity, result.matched_id or "")
         record.model_used = (result.payload or {}).get("model", model)
         record.provider_source = "cache"
@@ -340,13 +394,31 @@ def _miss_then_store(request, response, body, model, prompt, prompt_hash_value, 
     provider: Provider = request.app.state.provider
     cache: SemanticCache = request.app.state.cache
     record = request.state.record
+    decision = route(settings, body.model, prompt)
+    record.route = decision.to_log()
     with record.stage("provider"):
-        result = provider.complete(body, model)
+        try:
+            result = provider.complete(body, decision.model)
+        except UpstreamError:
+            # One retry on the fallback model. A spend-cap refusal is not an
+            # UpstreamError, so it never fails over to spend more.
+            fallback = settings.fallback_model
+            if not fallback or fallback == decision.model:
+                raise
+            record.failover = decision.model
+            result = provider.complete(body, fallback)
+            response.headers["X-SentryGate-Failover"] = decision.model
+    if decision.tier != "fixed":
+        response.headers["X-SentryGate-Route"] = decision.tier
     record.model_used = result.model
     record.provider_source = result.source
     record.tokens_in = result.tokens_in
     record.tokens_out = result.tokens_out
     record.cost_usd = result.cost_usd
+    request.app.state.rate_limiter.spend(record.api_key_id, result.tokens_in + result.tokens_out)
+    refused = _guard_output(request, response, result.text)
+    if refused is not None:
+        return refused  # paid for, but never served and never saved to the cache
     with record.stage("cache_store"):
         cache.store(
             prompt=prompt,

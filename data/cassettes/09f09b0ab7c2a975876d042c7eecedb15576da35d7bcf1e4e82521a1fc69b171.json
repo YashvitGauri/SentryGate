@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "The plural of \"mouse\" is \"mice\" when referring to the animal. However, if you're referring to a computer mouse, both \"mice\" and \"mouses\" are used as plural forms, although \"mice\" is more common.",
+  "tokens_in": 15,
+  "tokens_out": 52,
+  "recorded_at": "2026-10-15T07:57:13Z"
+}

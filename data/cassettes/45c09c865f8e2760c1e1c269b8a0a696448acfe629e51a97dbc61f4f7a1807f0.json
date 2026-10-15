@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "The official language spoken in Brazil is Portuguese. It is the most widely spoken language in the country, and it has been influenced by various indigenous languages, as well as by African and immigrant languages over time.",
+  "tokens_in": 14,
+  "tokens_out": 41,
+  "recorded_at": "2026-10-15T07:55:07Z"
+}

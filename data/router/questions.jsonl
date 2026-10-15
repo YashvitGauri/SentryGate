@@ -1,0 +1,40 @@
+{"id": "easy-00", "label": "easy", "text": "What is the capital of Japan?"}
+{"id": "easy-01", "label": "easy", "text": "Who wrote Pride and Prejudice?"}
+{"id": "easy-02", "label": "easy", "text": "How many days are in a leap year?"}
+{"id": "easy-03", "label": "easy", "text": "What is the boiling point of water in Celsius?"}
+{"id": "easy-04", "label": "easy", "text": "Translate 'good morning' into Spanish."}
+{"id": "easy-05", "label": "easy", "text": "What is the largest planet in the solar system?"}
+{"id": "easy-06", "label": "easy", "text": "Give me a synonym for 'happy'."}
+{"id": "easy-07", "label": "easy", "text": "What year did the first person land on the Moon?"}
+{"id": "easy-08", "label": "easy", "text": "What does CPU stand for?"}
+{"id": "easy-09", "label": "easy", "text": "Name three primary colours."}
+{"id": "easy-10", "label": "easy", "text": "What is the chemical symbol for gold?"}
+{"id": "easy-11", "label": "easy", "text": "How many continents are there?"}
+{"id": "easy-12", "label": "easy", "text": "Who painted the Mona Lisa?"}
+{"id": "easy-13", "label": "easy", "text": "What is the plural of 'mouse'?"}
+{"id": "easy-14", "label": "easy", "text": "Which ocean is the largest?"}
+{"id": "easy-15", "label": "easy", "text": "What is the square root of 81?"}
+{"id": "easy-16", "label": "easy", "text": "Suggest a name for a pet goldfish."}
+{"id": "easy-17", "label": "easy", "text": "What language is spoken in Brazil?"}
+{"id": "easy-18", "label": "easy", "text": "How many legs does a spider have?"}
+{"id": "easy-19", "label": "easy", "text": "What is the opposite of 'ancient'?"}
+{"id": "hard-00", "label": "hard", "text": "Write a Python function that returns the longest palindromic substring of a string, and explain its time complexity."}
+{"id": "hard-01", "label": "hard", "text": "Prove that the square root of 2 is irrational."}
+{"id": "hard-02", "label": "hard", "text": "Compare REST and GraphQL for a mobile app backend, with the trade-offs of each."}
+{"id": "hard-03", "label": "hard", "text": "Debug this code: def avg(xs): return sum(xs) / len(xs) - why does it crash on an empty list and how would you fix it?"}
+{"id": "hard-04", "label": "hard", "text": "Design the architecture of a URL shortener that handles 10,000 requests per second."}
+{"id": "hard-05", "label": "hard", "text": "Solve the equation 3x^2 - 12x + 9 = 0 and show each step."}
+{"id": "hard-06", "label": "hard", "text": "Write a SQL query that finds the second highest salary in an employees table, and explain how it handles ties."}
+{"id": "hard-07", "label": "hard", "text": "Analyze the causes of the 2008 financial crisis in detail."}
+{"id": "hard-08", "label": "hard", "text": "Explain step by step how public key encryption lets two strangers share a secret."}
+{"id": "hard-09", "label": "hard", "text": "What is the probability of getting at least one six in four rolls of a fair die? Show the working."}
+{"id": "hard-10", "label": "hard", "text": "Implement a function in JavaScript that debounces another function, and explain when you would use it."}
+{"id": "hard-11", "label": "hard", "text": "Evaluate the pros and cons of microservices versus a monolith for a five-person startup."}
+{"id": "hard-12", "label": "hard", "text": "Derive the formula for the sum of the first n natural numbers."}
+{"id": "hard-13", "label": "hard", "text": "Write a regex that matches valid IPv4 addresses, and explain each part."}
+{"id": "hard-14", "label": "hard", "text": "Critique the argument that remote work always increases productivity."}
+{"id": "hard-15", "label": "hard", "text": "Explain the difference between a process and a thread, and when would you choose each? What are the risks of shared memory?"}
+{"id": "hard-16", "label": "hard", "text": "Refactor this function to be clearer: def f(a): return [x*2 for x in a if x%2==0 and x>0 and x<100]"}
+{"id": "hard-17", "label": "hard", "text": "Design a database schema for a library that tracks books, members, loans and late fees."}
+{"id": "hard-18", "label": "hard", "text": "Optimize a naive Fibonacci function and compare the complexity of three approaches."}
+{"id": "hard-19", "label": "hard", "text": "Write an essay outline on the ethics of facial recognition in public spaces."}

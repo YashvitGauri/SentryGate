@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "Refactoring the function for clarity involves giving it a more descriptive name, adding comments if necessary, and improving code readability. Here's a revised version:\n\n```python\ndef double_positive_even_numbers_less_than_100(numbers):\n    \"\"\"\n    This function takes a list of numbers and returns a new list containing\n    each positive even number less than 100 from the input list, doubled.\n    \n    :param numbers: List of integers\n    :return: List of integers (filtered and transformed)\n    \"\"\"\n    result = []\n    for number in numbers:\n        if number > 0 and number < 100 and number % 2 == 0:\n            doubled_value = number * 2\n            result.append(doubled_value)\n    return result\n```\n\n### Key Changes:\n1. **Function Name**: Changed `f` to `double_positive_even_numbers_less_than_100` to clearly describe its purpose.\n2. **Variable Naming**: Used `numbers` for the input parameter to indicate it should be a list of numbers, and `number` in the loop for each individual element.\n3. **Code Structure**: Used a loop with an `if` statement for clarity, making the code easier to read.\n4. **Documentation**: Added a docstring to explain the function's purpose, parameters, and return value.",
+  "tokens_in": 43,
+  "tokens_out": 271,
+  "recorded_at": "2026-10-15T07:58:31Z"
+}

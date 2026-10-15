@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "The capital of Japan is Tokyo.",
+  "tokens_in": 14,
+  "tokens_out": 7,
+  "recorded_at": "2026-10-15T07:56:52Z"
+}

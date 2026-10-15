@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "The opposite of \"ancient\" is \"modern.\"",
+  "tokens_in": 16,
+  "tokens_out": 11,
+  "recorded_at": "2026-10-15T07:57:21Z"
+}

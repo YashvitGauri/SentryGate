@@ -1,0 +1,39 @@
+{
+  "projected_saving_by_mix": {
+    "50% easy": 13.8,
+    "80% easy": 26.6,
+    "90% easy": 40.7
+  },
+  "model_ms_p50": {
+    "cheap": 1898,
+    "strong": 2710
+  },
+  "questions": 40,
+  "easy": 20,
+  "hard": 20,
+  "blocked_or_failed": 0,
+  "router_cost_usd": 0.071937,
+  "strong_cost_usd": 0.083458,
+  "saved_pct": 13.8,
+  "sent_to_strong": 19,
+  "agrees_with_our_label": 39,
+  "hard_sent_cheap": [
+    "hard-15"
+  ],
+  "easy_sent_strong": [],
+  "cost_by_label": {
+    "easy": {
+      "router": 0.000408,
+      "strong": 0.005423
+    },
+    "hard": {
+      "router": 0.07153,
+      "strong": 0.078035
+    }
+  },
+  "failover": {
+    "failed_model": "openai/no-such-model-sentrygate",
+    "answered_by": "openai/gpt-4o-mini",
+    "status": 200
+  }
+}

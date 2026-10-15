@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "CPU stands for Central Processing Unit. It is the primary component of a computer that carries out instructions from programs by performing basic arithmetic, logic, control, and input/output operations. Often referred to as the \"brain\" of the computer, the CPU plays a crucial role in determining the system's overall performance.",
+  "tokens_in": 13,
+  "tokens_out": 61,
+  "recorded_at": "2026-10-15T07:54:49Z"
+}

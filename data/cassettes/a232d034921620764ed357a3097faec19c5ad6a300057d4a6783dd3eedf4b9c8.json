@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "The first person landed on the Moon in 1969.",
+  "tokens_in": 18,
+  "tokens_out": 12,
+  "recorded_at": "2026-10-15T07:57:03Z"
+}

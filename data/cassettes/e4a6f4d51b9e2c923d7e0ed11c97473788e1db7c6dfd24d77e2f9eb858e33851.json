@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "A spider has eight legs.",
+  "tokens_in": 15,
+  "tokens_out": 6,
+  "recorded_at": "2026-10-15T07:55:09Z"
+}

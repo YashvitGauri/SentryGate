@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "The square root of 81 is 9.",
+  "tokens_in": 16,
+  "tokens_out": 10,
+  "recorded_at": "2026-10-15T07:55:02Z"
+}

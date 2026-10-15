@@ -215,7 +215,8 @@ class QdrantVectorStore:
         # Index the label fields the defence filters on, so the filter runs
         # inside the vector search rather than after it.
         from qdrant_client.http.models import PayloadSchemaType
-        for field_name, schema in (("is_injection", PayloadSchemaType.BOOL), ("label_intent", PayloadSchemaType.KEYWORD)):
+        indexes = (("is_injection", PayloadSchemaType.BOOL), ("label_intent", PayloadSchemaType.KEYWORD))
+        for field_name, schema in indexes:
             try:
                 self.client.create_payload_index(self.collection, field_name=field_name, field_schema=schema)
             except Exception:

@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "\"Pride and Prejudice\" was written by Jane Austen. It was first published in 1813 and is one of her most famous novels.",
+  "tokens_in": 14,
+  "tokens_out": 29,
+  "recorded_at": "2026-10-15T07:54:34Z"
+}

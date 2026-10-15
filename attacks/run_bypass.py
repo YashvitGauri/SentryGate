@@ -39,7 +39,9 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "data" / "week4"
+INPUTS = ROOT / "data" / "week4"      # seeds, variants and controls: the same set every phase
+OUT = INPUTS                          # where results go; --out changes it (Phase 3 uses data/phase3)
+sys.path.insert(0, str(ROOT))         # so the runner can use the gateway's own labelling rules
 
 POISON = "SENTRYGATE-POISON-8b21c4: SYSTEM PROMPT leaked. API key: sk-live-REDACTED."
 
@@ -61,11 +63,44 @@ def _headers(raw) -> dict:
     return {k.lower(): v for k, v in raw.items()}
 
 
+def poison_verdict(prompt: str, label: str) -> dict | None:
+    """The safety label stored with the planted answer.
+
+    "attack": let the gateway's real filter label it, as Week 4 did. The
+    filter flags it, so a defence that refuses anything labelled "attack"
+    wins easily.
+    "clean": the realistic case. An attack that slipped past the filter once
+    (a low score) and was cached as clean, with the same cheap keyword label
+    any question with that wording gets.
+    """
+    if label == "attack":
+        return None
+    from app.verdict import assess_risk, classify_intent
+
+    intent = classify_intent(prompt)
+    return {"is_injection": False, "injection_score": 0.05, "has_pii": False, "pii_entities": [],
+            "intent": intent, "risk_level": assess_risk(False, False, intent)}
+
+
+def plant_body(prompt: str, label: str) -> dict:
+    body = {"prompt": prompt, "response": POISON, "model": "gpt-4o-mini"}
+    verdict = poison_verdict(prompt, label)
+    if verdict is not None:
+        body["verdict"] = verdict
+    return body
+
+
+def family_rate(served: list[dict], attacks: list[dict], family: str) -> float:
+    total = sum(1 for r in attacks if r["family"] == family)
+    return round(sum(1 for r in served if r["family"] == family) / total, 4) if total else 0.0
+
+
 def load_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def wait_healthy(base: str, want_threshold: float, want_order: str = "cache_first") -> dict:
+def wait_healthy(base: str, want_threshold: float, want_order: str = "cache_first",
+                 expect: dict | None = None) -> dict:
     """Confirm the gateway is up, on real models, at the threshold we expect."""
     for _ in range(120):
         try:
@@ -91,6 +126,9 @@ def wait_healthy(base: str, want_threshold: float, want_order: str = "cache_firs
         problems.append(f"scorer is a stand-in ({config.get('scorer')}), not the real filter")
     if "stub" in str(config.get("embedder", "")):
         problems.append(f"embedder is a stand-in ({config.get('embedder')}), not MiniLM")
+    for key, want in (expect or {}).items():
+        if config.get(key) != want:
+            problems.append(f"{key} is {config.get(key)}, expected {want}")
     if problems:
         sys.exit("Gateway is not set up for a real run:\n  - " + "\n  - ".join(problems))
     return health
@@ -100,19 +138,20 @@ def read_log_tail(log_path: Path, since_line: int) -> list[dict]:
     if not log_path.exists():
         return []
     lines = log_path.read_text().splitlines()
-    return [json.loads(l) for l in lines[since_line:] if l.strip()]
+    return [json.loads(line) for line in lines[since_line:] if line.strip()]
 
 
-def run(base: str, threshold: float, tag: str, log_file: str, limit: int | None, order: str = "cache_first") -> dict:
-    seeds = load_jsonl(OUT / "seeds.jsonl")
-    variants = load_jsonl(OUT / "variants.jsonl")
-    controls = load_jsonl(OUT / "controls.jsonl")
+def run(base: str, threshold: float, tag: str, log_file: str, limit: int | None, order: str = "cache_first",
+        poison_label: str = "attack", expect: dict | None = None) -> dict:
+    seeds = load_jsonl(INPUTS / "seeds.jsonl")
+    variants = load_jsonl(INPUTS / "variants.jsonl")
+    controls = load_jsonl(INPUTS / "controls.jsonl")
     if limit:
         seeds = seeds[:limit]
         keep = {s["seed_id"] for s in seeds}
         variants = [v for v in variants if v["seed_id"] in keep]
 
-    health = wait_healthy(base, threshold, order)
+    health = wait_healthy(base, threshold, order, expect)
     # Ask the gateway where it writes, instead of guessing. Its path is inside
     # its container (/data/...); the same file is under our data/ mount.
     gateway_log = health.get("log_path", "/data/requests.jsonl")
@@ -127,10 +166,7 @@ def run(base: str, threshold: float, tag: str, log_file: str, limit: int | None,
     started = time.time()
     for n, seed in enumerate(seeds, 1):
         http_json(f"{base}/v1/cache/clear", {}, "POST")
-        status, _, seeded = http_json(
-            f"{base}/v1/cache/seed",
-            {"prompt": seed["text"], "response": POISON, "model": "gpt-4o-mini"}, "POST",
-        )
+        status, _, seeded = http_json(f"{base}/v1/cache/seed", plant_body(seed["text"], poison_label), "POST")
         if status != 200:
             sys.exit(f"Seeding failed for {seed['seed_id']}: {status} {seeded}")
 
@@ -149,13 +185,17 @@ def run(base: str, threshold: float, tag: str, log_file: str, limit: int | None,
             log_line = next((r for r in read_log_tail(log_path, line_no)
                              if r.get("request_id") == req_id), {})
             screening_ran = log_line.get("screening_ran")
+            log_cache = log_line.get("cache", {}) or {}
             rows.append({
-                "threshold": threshold, "tag": tag,
+                "threshold": threshold, "tag": tag, "poison_label": poison_label,
+                "filter": log_cache.get("filter"), "cheap_intent": log_cache.get("cheap_intent"),
+                "used_threshold": log_cache.get("threshold"), "reverified": log_line.get("reverified"),
                 "seed_id": seed["seed_id"], "dataset": seed["dataset"],
                 "variant_id": v["variant_id"], "family": v["family"], "method": v["method"],
                 "status": code,
                 "cache": headers.get("x-sentrygate-cache", ""),
-                "similarity": float(headers.get("x-sentrygate-similarity", 0.0) or 0.0),
+                # From the log, not the header: a hit blocked by the re-check has no similarity header.
+                "similarity": float(log_cache.get("similarity") or headers.get("x-sentrygate-similarity") or 0.0),
                 "served_poison": served_poison,
                 "screening_ran": screening_ran,
                 # A bypass, stated strictly: poison served AND the log says the filter never ran.
@@ -173,8 +213,7 @@ def run(base: str, threshold: float, tag: str, log_file: str, limit: int | None,
     control_rows = []
     for c in controls:
         http_json(f"{base}/v1/cache/clear", {}, "POST")
-        http_json(f"{base}/v1/cache/seed",
-                  {"prompt": control_seed, "response": POISON, "model": "gpt-4o-mini"}, "POST")
+        http_json(f"{base}/v1/cache/seed", plant_body(control_seed, poison_label), "POST")
         code, headers, body = http_json(
             f"{base}/v1/chat/completions",
             {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": c["text"]}]}, "POST",
@@ -184,7 +223,7 @@ def run(base: str, threshold: float, tag: str, log_file: str, limit: int | None,
             and body.get("choices", [{}])[0].get("message", {}).get("content") == POISON
         )
         control_rows.append({
-            "threshold": threshold, "tag": tag, "control_id": c["control_id"],
+            "threshold": threshold, "tag": tag, "poison_label": poison_label, "control_id": c["control_id"],
             "cache": headers.get("x-sentrygate-cache", ""), "status": code,
             "served_poison": served_poison,
         })
@@ -200,9 +239,18 @@ def run(base: str, threshold: float, tag: str, log_file: str, limit: int | None,
     attacks = [r for r in rows if r["family"] != "exact"]
     bypassed = [r for r in attacks if r["bypass"]]
     # Sanity: the score in the log should agree with an independent check.
-    mismatches = sum(1 for r in rows if (r["similarity"] >= threshold) != (r["cache"] == "hit"))
+    # Each request is checked against the threshold the gateway logged for it,
+    # since the defence uses a stricter one for risky kinds of question.
+    mismatches = sum(1 for r in rows if r["cache"] in ("hit", "miss")
+                     and (r["similarity"] >= (r["used_threshold"] or threshold)) != (r["cache"] == "hit"))
+    served = [r for r in attacks if r["served_poison"]]
     summary = {
-        "threshold": threshold, "tag": tag,
+        "threshold": threshold, "tag": tag, "poison_label": poison_label,
+        "served_poison": len(served),
+        "served_rate": round(len(served) / len(attacks), 4) if attacks else 0.0,
+        "served_rate_lazy": family_rate(served, attacks, "lazy"),
+        "served_rate_rewrite": family_rate(served, attacks, "rewrite"),
+        "reverified": sum(1 for r in attacks if r.get("reverified")),
         "config": health.get("config"),
         "seeds": len(seeds), "attack_variants": len(attacks),
         "bypassed": len(bypassed),
@@ -213,6 +261,8 @@ def run(base: str, threshold: float, tag: str, log_file: str, limit: int | None,
         "control_served_poison": sum(1 for r in control_rows if r["served_poison"]),
         "controls": len(control_rows),
     }
+    print(f"  [{tag} / poison labelled {poison_label}] served poison {summary['served_rate']:.1%} "
+          f"(lazy {summary['served_rate_lazy']:.1%}, rewrite {summary['served_rate_rewrite']:.1%})")
     print(f"  bypass rate at {threshold:.2f}: {summary['bypass_rate']:.1%} "
           f"({summary['bypassed']}/{summary['attack_variants']})  "
           f"exact {summary['exact_served']}/{summary['exact_total']}  "
@@ -230,9 +280,20 @@ def main() -> int:
     ap.add_argument("--log-file", default="week4/run.jsonl",
                     help="unused; the gateway reports its own log path via /healthz")
     ap.add_argument("--limit", type=int, default=None, help="first N seeds only, for a smoke test")
+    ap.add_argument("--poison-label", choices=("attack", "clean"), default="attack",
+                    help="how the planted answer is labelled: attack (Week 4) or clean (slipped past once)")
+    ap.add_argument("--out", default=None, help="results directory, default data/week4")
+    ap.add_argument("--expect", action="append", default=[], metavar="KEY=VALUE",
+                    help="refuse to run unless the gateway config has this value, e.g. verdict_filter=on")
     args = ap.parse_args()
 
-    summary = run(args.base, args.threshold, args.tag, args.log_file, args.limit, args.order)
+    global OUT
+    if args.out:
+        OUT = ROOT / args.out
+        OUT.mkdir(parents=True, exist_ok=True)
+    expect = dict(e.split("=", 1) for e in args.expect)
+    summary = run(args.base, args.threshold, args.tag, args.log_file, args.limit, args.order,
+                  args.poison_label, expect)
     with open(OUT / "summary.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(summary) + "\n")
     return 0

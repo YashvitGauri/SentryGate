@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "The three primary colors are red, blue, and yellow.",
+  "tokens_in": 12,
+  "tokens_out": 12,
+  "recorded_at": "2026-10-15T07:54:50Z"
+}

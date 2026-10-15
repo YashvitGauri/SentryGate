@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "There are seven continents on Earth. They are:\n\n1. Africa\n2. Antarctica\n3. Asia\n4. Europe\n5. North America\n6. Oceania (also known as Australia)\n7. South America",
+  "tokens_in": 13,
+  "tokens_out": 45,
+  "recorded_at": "2026-10-15T07:57:09Z"
+}

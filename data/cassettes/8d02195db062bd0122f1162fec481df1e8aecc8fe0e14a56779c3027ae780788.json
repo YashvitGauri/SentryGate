@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "The Mona Lisa was painted by Leonardo da Vinci.",
+  "tokens_in": 13,
+  "tokens_out": 10,
+  "recorded_at": "2026-10-15T07:57:11Z"
+}

@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "The boiling point of water at standard atmospheric pressure (1 atmosphere) is 100 degrees Celsius.",
+  "tokens_in": 17,
+  "tokens_out": 19,
+  "recorded_at": "2026-10-15T07:54:38Z"
+}

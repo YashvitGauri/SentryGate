@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "\"Pride and Prejudice\" was written by Jane Austen and first published in 1813.",
+  "tokens_in": 14,
+  "tokens_out": 19,
+  "recorded_at": "2026-10-15T07:56:53Z"
+}

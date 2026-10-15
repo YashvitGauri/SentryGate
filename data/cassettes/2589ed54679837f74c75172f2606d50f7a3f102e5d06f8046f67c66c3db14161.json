@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "The first person landed on the Moon on July 20, 1969, during NASA's Apollo 11 mission. Astronauts Neil Armstrong and Buzz Aldrin became the first humans to set foot on the lunar surface, while Michael Collins remained in lunar orbit in the command module.",
+  "tokens_in": 18,
+  "tokens_out": 57,
+  "recorded_at": "2026-10-15T07:54:47Z"
+}

@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "The largest ocean on Earth is the Pacific Ocean. It covers an area of about 63 million square miles (165 million square kilometers), making it larger than all of the Earth\u2019s landmasses combined. The Pacific Ocean is bordered by numerous countries and is home to many islands and diverse marine ecosystems.",
+  "tokens_in": 13,
+  "tokens_out": 60,
+  "recorded_at": "2026-10-15T07:55:01Z"
+}

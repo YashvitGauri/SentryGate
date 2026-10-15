@@ -1,0 +1,14 @@
+HTTP/1.1 200 OK
+date: Thu, 15 Oct 2026 07:58:46 GMT
+server: uvicorn
+content-length: 309
+content-type: application/json
+x-sentrygate-screened: true
+x-sentrygate-verdict: clean
+x-sentrygate-injection-score: 0.000
+x-sentrygate-failover: openai/no-such-model-sentrygate
+x-sentrygate-route: cheap
+x-sentrygate-provider: live
+x-sentrygate-cache: miss
+x-sentrygate-request-id: b8012b8820674b729b8594da3a3d8ba7
+

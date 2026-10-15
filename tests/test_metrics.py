@@ -6,8 +6,6 @@ real log and compute the obvious things correctly.
 
 from __future__ import annotations
 
-import json
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -84,8 +82,10 @@ def gateway(tmp_path, monkeypatch):
 
 
 def test_metrics_endpoint_reflects_real_traffic(gateway):
-    ask = lambda p: gateway.post("/v1/chat/completions",
-                                 json={"model": "gpt-4o-mini", "messages": [{"role": "user", "content": p}]})
+    def ask(prompt):
+        gateway.post("/v1/chat/completions",
+                     json={"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}]})
+
     ask("what is the capital of France?")
     ask("what is the capital of France?")  # a hit
     summary = gateway.get("/metrics/summary").json()

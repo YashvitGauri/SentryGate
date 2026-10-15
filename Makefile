@@ -11,7 +11,7 @@ REDIS_HOST_PORT ?= 6380
 export REDIS_HOST_PORT
 
 .PHONY: docker-build docker-demo docker-demo-run docker-demo-fast phase2-up phase2-down demo demo-fast poc poc-fast capture diagram deck present freeze \
-        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test demo-up gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx report report-pptx cache-reset live-smoke
+        gateway-build gateway-up gateway-down gateway-logs gateway-smoke gateway-test demo-up gateway-demo paper-pdf variants bypass figures eval deck-phase2 deck-phase2-pptx report report-pptx cache-reset live-smoke defence defence-figures lint
 
 docker-build:   ## Build the image (bakes both models in, ~2.2GB, takes a few min)
 	docker compose build poc
@@ -112,6 +112,16 @@ variants: attacks-build  ## Regenerate the attack variants from public datasets
 
 bypass: attacks-build   ## Run the full sweep on the real gateway (the Phase 2 result)
 	bash attacks/sweep.sh
+
+lint:           ## Check the Python code with ruff (pinned, in a throwaway container)
+	docker run --rm -v $(CURDIR):/src -w /src python:3.11-slim sh -c \
+	  "pip install -q ruff==0.6.9 && ruff check --select E,F,W --line-length 120 app attacks eval tests"
+
+defence: attacks-build  ## Run the Phase 3 sweep: five defence arms, both poison labels, honest questions
+	bash attacks/sweep_phase3.sh
+
+defence-figures: attacks-build  ## Rebuild the Phase 3 table and charts from the results
+	docker run --rm -v $(CURDIR):/src -w /src sentrygate-attacks python -m eval.phase3_figures
 
 figures: attacks-build  ## Rebuild the table and chart from the results
 	docker run --rm -v $(CURDIR):/src -w /src sentrygate-attacks python -m eval.make_figures

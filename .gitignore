@@ -17,6 +17,10 @@ data/spend_ledger.json
 # Week 4: keep the derived attack set and results, not the bulky regenerables.
 data/week4/raw/
 data/week4/run-*.jsonl
+# Phase 3 raw gateway logs (40+ MB). The summaries built from them are committed.
+data/phase3/run-*.jsonl
+data/router/run-*.jsonl
+data/mitigations/requests.jsonl
 data/week4/smoke.jsonl
 data/week5/
 .DS_Store

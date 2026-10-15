@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "A leap year has 366 days. This is one day more than a typical year, which has 365 days. The additional day is added to February, giving it 29 days instead of the usual 28. Leap years occur every four years, with some exceptions for century years that are not divisible by 400.",
+  "tokens_in": 16,
+  "tokens_out": 65,
+  "recorded_at": "2026-10-15T07:56:55Z"
+}

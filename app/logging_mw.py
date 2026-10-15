@@ -76,6 +76,9 @@ class RequestRecord:
     cheap_intent: str | None = None     # Phase 3: the keyword label used for that
     reverified: bool = False            # Phase 3: hit re-checked before serving
 
+    route: dict[str, Any] | None = None   # Phase 3: which model the router picked, and why
+    failover: str | None = None           # Phase 3: the model that failed, when the fallback answered
+    output_flags: list[str] = field(default_factory=list)   # Phase 3: what the output guard found
     provider_source: str | None = None
     tokens_in: int = 0
     tokens_out: int = 0
@@ -117,6 +120,9 @@ class RequestRecord:
                 "cheap_intent": self.cheap_intent,
             },
             "provider": self.provider_source,
+            "route": self.route,
+            "failover": self.failover,
+            "output_flags": self.output_flags,
             "tokens": {"in": self.tokens_in, "out": self.tokens_out},
             "cost_usd": round(self.cost_usd, 8),
             "latency_ms": self.latency_ms,

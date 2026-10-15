@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "The largest planet in the solar system is Jupiter. It is a gas giant, primarily composed of hydrogen and helium, and has a diameter of about 86,881 miles (139,822 kilometers). Jupiter is known for its prominent Great Red Spot, a giant storm, and its many moons, including the four largest known as the Galilean moons: Io, Europa, Ganymede, and Callisto.",
+  "tokens_in": 17,
+  "tokens_out": 82,
+  "recorded_at": "2026-10-15T07:54:42Z"
+}

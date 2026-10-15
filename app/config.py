@@ -20,6 +20,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 PIPELINE_ORDERS = ("cache_first", "screen_first")
+REVERIFY_SCOPES = ("risky", "all")
+OUTPUT_GUARD_MODES = ("off", "flag", "block")
 PROVIDER_MODES = ("mock", "replay", "live")
 ROUTER_MODES = ("fixed", "difficulty")
 SCREENING_SCORERS = ("auto", "stub", "hf")
@@ -88,6 +90,13 @@ class Settings:
     cache_verdict_filter: bool
     cache_reverify_high_risk: bool
     router_mode: str
+    # Phase 3 router: with ROUTER_MODE=difficulty, questions scoring at least
+    # router_hard_score go to the strong model, the rest to the cheap one.
+    router_cheap_model: str
+    router_strong_model: str
+    router_hard_score: float
+    # Phase 3: if the chosen model's call fails, try this one once. Empty = off.
+    fallback_model: str
     sim_threshold: float
     # Phase 3: risky kinds of question (credentials, tool use, personal data)
     # need a closer match before a cached answer is reused.
@@ -95,6 +104,17 @@ class Settings:
     # Phase 3: a cached answer whose stored injection score is at least this
     # was a close call when it was saved, so it is re-checked before serving.
     reverify_score: float
+    # Phase 3: which cache hits the re-check covers. risky = only the hits the
+    # rules above pick (fast, but misses attacks the keyword label calls
+    # harmless). all = every hit (safe; still skips the paid model call).
+    reverify_scope: str
+
+    # --- Phase 3 mitigations --------------------------------------------------
+    # Scan every answer (cache hits too) for script, SQL, shell and secrets.
+    output_guard: str
+    # Per caller. 0 = off.
+    rate_limit_rpm: int
+    token_budget_per_day: int
 
     # --- screening (Week 2) -------------------------------------------------
     injection_threshold: float
@@ -135,9 +155,17 @@ class Settings:
             cache_verdict_filter=_bool("CACHE_VERDICT_FILTER", False),
             cache_reverify_high_risk=_bool("CACHE_REVERIFY_HIGH_RISK", False),
             router_mode=_one_of("ROUTER_MODE", "fixed", ROUTER_MODES),
+            router_cheap_model=_str("ROUTER_CHEAP_MODEL", _str("DEFAULT_MODEL", "gpt-4o-mini")),
+            router_strong_model=_str("ROUTER_STRONG_MODEL", "gpt-4o"),
+            router_hard_score=_float("ROUTER_HARD_SCORE", 0.4),
+            fallback_model=_str("FALLBACK_MODEL", ""),
             sim_threshold=_float("SIM_THRESHOLD", 0.85),
             cache_strict_threshold=_float("CACHE_STRICT_THRESHOLD", 0.95),
             reverify_score=_float("REVERIFY_SCORE", 0.2),
+            reverify_scope=_one_of("REVERIFY_SCOPE", "risky", REVERIFY_SCOPES),
+            output_guard=_one_of("OUTPUT_GUARD", "off", OUTPUT_GUARD_MODES),
+            rate_limit_rpm=int(_float("RATE_LIMIT_RPM", 0)),
+            token_budget_per_day=int(_float("TOKEN_BUDGET_PER_DAY", 0)),
             injection_threshold=_float("INJECTION_THRESHOLD", 0.5),
             screening_scorer=_one_of("SCREENING_SCORER", "auto", SCREENING_SCORERS),
             embed_model=_str("EMBED_MODEL", "all-MiniLM-L6-v2"),
@@ -166,6 +194,10 @@ class Settings:
             raise ConfigError(f"SIM_THRESHOLD must be between 0 and 1, got {self.sim_threshold}")
         if not 0.0 < self.cache_strict_threshold <= 1.0:
             raise ConfigError(f"CACHE_STRICT_THRESHOLD must be between 0 and 1, got {self.cache_strict_threshold}")
+        if not 0.0 < self.router_hard_score <= 1.0:
+            raise ConfigError(f"ROUTER_HARD_SCORE must be between 0 and 1, got {self.router_hard_score}")
+        if self.rate_limit_rpm < 0 or self.token_budget_per_day < 0:
+            raise ConfigError("RATE_LIMIT_RPM and TOKEN_BUDGET_PER_DAY must be 0 (off) or more")
         if not 0.0 <= self.reverify_score <= 1.0:
             raise ConfigError(f"REVERIFY_SCORE must be between 0 and 1, got {self.reverify_score}")
         if not 0.0 < self.injection_threshold <= 1.0:
@@ -191,9 +223,16 @@ class Settings:
             "verdict_filter": "on" if self.cache_verdict_filter else "off",
             "reverify": "on" if self.cache_reverify_high_risk else "off",
             "router": self.router_mode,
+            "router_models": [self.router_cheap_model, self.router_strong_model]
+            if self.router_mode == "difficulty" else None,
+            "fallback_model": self.fallback_model or None,
             "sim_threshold": self.sim_threshold,
             "strict_threshold": self.cache_strict_threshold,
             "reverify_score": self.reverify_score,
+            "reverify_scope": self.reverify_scope,
+            "output_guard": self.output_guard,
+            "rate_limit_rpm": self.rate_limit_rpm,
+            "token_budget_per_day": self.token_budget_per_day,
             "provider_mode": self.provider_mode,
             "build_sha": self.build_sha,
         }

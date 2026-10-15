@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "The official language spoken in Brazil is Portuguese.",
+  "tokens_in": 14,
+  "tokens_out": 9,
+  "recorded_at": "2026-10-15T07:57:19Z"
+}

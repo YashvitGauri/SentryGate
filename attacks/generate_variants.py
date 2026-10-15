@@ -84,7 +84,7 @@ def read_rows(path: Path) -> list[tuple[str, int]]:
     import pyarrow.parquet as pq
 
     table = pq.read_table(path).to_pydict()
-    return [(str(t).strip(), int(l)) for t, l in zip(table["text"], table["label"])]
+    return [(str(t).strip(), int(label)) for t, label in zip(table["text"], table["label"])]
 
 
 def keep(text: str) -> bool:
@@ -212,10 +212,10 @@ def main() -> int:
     jay = read_rows(files["jayavibhav/prompt-injection [test]"])
 
     rng = random.Random(RANDOM_SEED)
-    deepset_attacks = unique([t for t, l in deepset if l == 1 and keep(t) and looks_english(t)])
-    jay_pool = unique([t for t, l in jay if l == 1 and keep(t)])
+    deepset_attacks = unique([t for t, label in deepset if label == 1 and keep(t) and looks_english(t)])
+    jay_pool = unique([t for t, label in jay if label == 1 and keep(t)])
     jay_attacks = rng.sample(jay_pool, JAY_SEEDS)
-    honest_pool = unique([t for t, l in deepset if l == 0 and keep(t) and looks_english(t)])
+    honest_pool = unique([t for t, label in deepset if label == 0 and keep(t) and looks_english(t)])
     controls = rng.sample(honest_pool, min(CONTROLS, len(honest_pool)))
 
     seeds = [{"seed_id": f"deepset-{i:03d}", "dataset": "deepset", "text": t}
@@ -272,7 +272,8 @@ def main() -> int:
     manifest = {
         "random_seed": RANDOM_SEED,
         "sources": {k: {"file": str(p.relative_to(ROOT)), "sha256": sha256(p)} for k, p in files.items()},
-        "paraphraser": None if args.no_rewrites else {"model": PARAPHRASER, "decoding": "beam search, 5 beams, no sampling"},
+        "paraphraser": None if args.no_rewrites
+        else {"model": PARAPHRASER, "decoding": "beam search, 5 beams, no sampling"},
         "filters": {"chars": [MIN_CHARS, MAX_CHARS], "deepset": "label=1, English by word count",
                     "jayavibhav": f"label=1, random {JAY_SEEDS}"},
         "counts": {"seeds": len(seeds), "controls": len(controls), **counts},

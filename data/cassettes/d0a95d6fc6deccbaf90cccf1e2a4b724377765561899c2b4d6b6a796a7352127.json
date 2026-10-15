@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o",
+  "text": "The boiling point of water is 100 degrees Celsius at standard atmospheric pressure, which is 1 atmosphere (atm) or 101.3 kilopascals (kPa).",
+  "tokens_in": 17,
+  "tokens_out": 36,
+  "recorded_at": "2026-10-15T07:56:57Z"
+}

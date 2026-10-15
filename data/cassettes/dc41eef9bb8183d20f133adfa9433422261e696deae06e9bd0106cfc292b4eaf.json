@@ -1,0 +1,7 @@
+{
+  "model": "openai/gpt-4o-mini",
+  "text": "The chemical symbol for gold is Au.",
+  "tokens_in": 15,
+  "tokens_out": 8,
+  "recorded_at": "2026-10-15T07:54:52Z"
+}
