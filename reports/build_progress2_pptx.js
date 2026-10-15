@@ -14,59 +14,16 @@
 
 const fs = require("fs");
 const path = require("path");
-const pptxgen = require("pptxgenjs");
+const { C, makeDeck } = require("./deck_common");
 
 const ROOT = path.join(__dirname, "..");
 const R = JSON.parse(fs.readFileSync(path.join(ROOT, "data/week4/report.json"), "utf8"));
 
-// ---- design tokens, sampled from Progress Report 1 -------------------------
-const CREAM = "F9F8F4", NAVY = "1B2433", GOLD = "C9A05A";
-const RED = "B5452F", GREEN = "3F7A52", BLUE = "2D5A87", SLATE = "4A4F5A";
-const TEXT = "1B2433", MUTED = "4A5260", FAINT = "6B7280";
-const LINE = "E3DED2", ALT = "F3F1EA", WHITE = "FFFFFF", PILL = "F1EEE6";
-const FONT = "Roboto";
-const W = 13.333, H = 7.5, MX = 0.7;
+const { CREAM, NAVY, GOLD, RED, GREEN, BLUE, SLATE, TEXT, MUTED, LINE, ALT, WHITE, PILL, FONT, W, MX } = C;
 const TOTAL = 11;
 
-const pres = new pptxgen();
-pres.layout = "LAYOUT_WIDE";
-pres.defineSlideMaster({ title: "CREAM", background: { color: CREAM } });
-pres.defineSlideMaster({ title: "NAVY", background: { color: NAVY } });
-
-let pageNo = 0;
-function slide(notes, master = "CREAM") {
-  const s = pres.addSlide({ masterName: master });
-  pageNo += 1;
-  if (notes) s.addNotes(notes);
-  if (master === "CREAM" && pageNo > 1) {
-    s.addText("SentryGate · Progress Report 2", { x: MX, y: 7.0, w: 5, h: 0.3, isTextBox: true, margin: 0,
-      fontFace: FONT, fontSize: 9.5, color: MUTED });
-    s.addText(String(pageNo).padStart(2, "0"), { x: W - 1.4, y: 7.0, w: 0.9, h: 0.3, isTextBox: true, margin: 0,
-      fontFace: FONT, fontSize: 10, color: MUTED, align: "right" });
-  }
-  return s;
-}
-function label(s, text, y = 0.47) {
-  s.addText(text.toUpperCase(), { x: MX, y, w: 10, h: 0.3, isTextBox: true, margin: 0,
-    fontFace: FONT, fontSize: 12, color: GOLD });
-}
-function title(s, text, y = 0.85) {
-  s.addText(text, { x: MX, y, w: W - 2 * MX, h: 0.75, isTextBox: true, margin: 0,
-    fontFace: FONT, fontSize: 31, color: NAVY, valign: "middle" });
-}
-function sub(s, text, y = 1.7, italic = true, h = 0.5) {
-  s.addText(text, { x: MX, y, w: W - 2 * MX, h, isTextBox: true, margin: 0,
-    fontFace: FONT, fontSize: 13.5, italic, color: MUTED, lineSpacingMultiple: 1.15, valign: "top" });
-}
-function card(s, x, y, w, h, fill = WHITE, line = LINE) {
-  s.addShape(pres.ShapeType.roundRect, { x, y, w, h, rectRadius: 0.07,
-    fill: { color: fill }, line: { color: line, width: 1 } });
-}
-function pill(s, x, y, w, h, text, fill, color = WHITE) {
-  s.addShape(pres.ShapeType.roundRect, { x, y, w, h, rectRadius: h / 2, fill: { color: fill }, line: { color: fill, width: 0 } });
-  s.addText(text, { x, y, w, h, isTextBox: true, margin: 0, fontFace: FONT, fontSize: 11,
-    color, align: "center", valign: "middle" });
-}
+const D = makeDeck("SentryGate · Progress Report 2");
+const { pres, slide, label, title, sub, card, pill } = D;
 
 const byT = (k) => R.by_threshold[k];
 const T085 = byT("0.85");
@@ -376,7 +333,7 @@ const NREQ = LAT.reduce((a, r) => a + r.n, 0);
   s.addText("NEXT REVIEW — 24 OCTOBER 2026", { x: MX, y: 6.85, w: 6, h: 0.3, isTextBox: true, margin: 0, fontFace: FONT, fontSize: 12, color: GOLD });
 })();
 
-if (pageNo !== TOTAL) throw new Error(`expected ${TOTAL} slides, built ${pageNo}`);
+if (D.pageNo !== TOTAL) throw new Error(`expected ${TOTAL} slides, built ${D.pageNo}`);
 const out = path.join(ROOT, "reports/out/SentryGate_Progress_Report_2.pptx");
 fs.mkdirSync(path.dirname(out), { recursive: true });
-pres.writeFile({ fileName: out }).then(() => console.log(`wrote reports/out/SentryGate_Progress_Report_2.pptx (${pageNo} slides)`));
+pres.writeFile({ fileName: out }).then(() => console.log(`wrote reports/out/SentryGate_Progress_Report_2.pptx (${D.pageNo} slides)`));
